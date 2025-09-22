@@ -1,10 +1,25 @@
+/**
+ * SwipeScreen Component
+ * 
+ * The main swiping interface where users can discover and rate movies/TV shows.
+ * Features include:
+ * - Card stack management (always maintains 5 cards)
+ * - Swipe gestures for liking/disliking content
+ * - Infinite scroll with automatic loading
+ * - Recommendation system integration
+ * - User preference tracking
+ * 
+ * @author Flicksy Team
+ * @version 1.0.0
+ */
+
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Dimensions,
-  StyleSheet,
-  View
+    ActivityIndicator,
+    Alert,
+    Dimensions,
+    StyleSheet,
+    View
 } from 'react-native';
 import MovieCard from '../components/MovieCard';
 import { ThemedText } from '../components/ThemedText';
@@ -13,21 +28,42 @@ import { useAuth } from '../contexts/AuthContext';
 import { Movie, movieApi, TVShow } from '../services/movieApi';
 import { recommendationService } from '../services/recommendationService';
 
+// Screen dimensions for responsive design
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
+/**
+ * Main SwipeScreen component
+ * 
+ * Manages the card stack, handles user interactions, and integrates with
+ * the recommendation system to provide personalized content discovery.
+ */
 export default function SwipeScreen() {
-  const { user, updatePreferences } = useAuth();
-  const [allCards, setAllCards] = useState<(Movie | TVShow)[]>([]);
-  const [cardStack, setCardStack] = useState<(Movie | TVShow)[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [swipedCardIds, setSwipedCardIds] = useState<Set<number>>(new Set());
+  // ==================== HOOKS AND STATE ====================
+  
+  const { user, updatePreferences } = useAuth(); // Authentication context
+  
+  // State management for card data and UI
+  const [allCards, setAllCards] = useState<(Movie | TVShow)[]>([]); // All loaded cards
+  const [cardStack, setCardStack] = useState<(Movie | TVShow)[]>([]); // Current 5-card stack
+  const [isLoading, setIsLoading] = useState(true); // Initial loading state
+  const [isLoadingMore, setIsLoadingMore] = useState(false); // Loading more cards state
+  const [swipedCardIds, setSwipedCardIds] = useState<Set<number>>(new Set()); // Track swiped cards
 
+  // ==================== EFFECTS ====================
+  
+  /**
+   * Load initial cards when component mounts
+   */
   useEffect(() => {
     loadInitialCards();
   }, []);
 
-  // Ensure we always have exactly 5 cards in the stack
+  /**
+   * Maintain exactly 5 cards in the stack at all times
+   * 
+   * This effect ensures the card stack always has 5 cards for smooth swiping.
+   * It refills the stack with available cards when cards are swiped away.
+   */
   useEffect(() => {
     if (cardStack.length < 5 && allCards.length > 0) {
       console.log(`Card stack has ${cardStack.length} cards, refilling to 5...`);
@@ -43,6 +79,13 @@ export default function SwipeScreen() {
     }
   }, [cardStack.length, allCards, swipedCardIds, cardStack]);
 
+  /**
+   * Load initial cards for the swipe interface
+   * 
+   * This function determines whether to load personalized recommendations
+   * (for existing users with preferences) or mixed content (for new users).
+   * It sets up the initial card stack with the first 5 cards.
+   */
   const loadInitialCards = async () => {
     try {
       setIsLoading(true);

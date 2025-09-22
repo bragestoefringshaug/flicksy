@@ -1,29 +1,53 @@
+/**
+ * Authentication Context
+ * 
+ * Provides authentication state and methods throughout the app.
+ * Manages user login, registration, logout, and preference updates.
+ * Uses AsyncStorage for persistent user session management.
+ * 
+ * @author Flicksy Team
+ * @version 1.0.0
+ */
+
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
+/**
+ * User interface defining the structure of user data
+ */
 interface User {
-  id: string;
-  email: string;
-  name: string;
+  id: string; // Unique user identifier
+  email: string; // User's email address
+  name: string; // User's display name
   preferences: {
-    genres: string[];
-    likedMovies: number[];
-    dislikedMovies: number[];
-    watchlist: number[];
+    genres: string[]; // User's preferred genres
+    likedMovies: number[]; // Array of liked movie IDs
+    dislikedMovies: number[]; // Array of disliked movie IDs
+    watchlist: number[]; // Array of watchlist movie/TV show IDs
   };
 }
 
+/**
+ * Authentication context type defining available methods and state
+ */
 interface AuthContextType {
-  user: User | null;
-  isLoading: boolean;
-  login: (email: string, password: string) => Promise<boolean>;
-  register: (email: string, password: string, name: string) => Promise<boolean>;
-  logout: () => Promise<void>;
-  updatePreferences: (preferences: Partial<User['preferences']>) => Promise<void>;
+  user: User | null; // Current user or null if not logged in
+  isLoading: boolean; // Loading state for authentication operations
+  login: (email: string, password: string) => Promise<boolean>; // Login method
+  register: (email: string, password: string, name: string) => Promise<boolean>; // Registration method
+  logout: () => Promise<void>; // Logout method
+  updatePreferences: (preferences: Partial<User['preferences']>) => Promise<void>; // Update user preferences
 }
 
+// Create the authentication context
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+/**
+ * Custom hook to use the authentication context
+ * 
+ * @returns AuthContextType - The authentication context value
+ * @throws Error if used outside of AuthProvider
+ */
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
@@ -32,14 +56,37 @@ export const useAuth = () => {
   return context;
 };
 
+/**
+ * AuthProvider Component
+ * 
+ * Provides authentication context to all child components.
+ * Manages user state, authentication methods, and persistent storage.
+ * 
+ * @param children - React children components
+ */
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  // ==================== STATE ====================
+  
+  const [user, setUser] = useState<User | null>(null); // Current user state
+  const [isLoading, setIsLoading] = useState(true); // Loading state for auth operations
 
+  // ==================== EFFECTS ====================
+  
+  /**
+   * Load user data from AsyncStorage on component mount
+   */
   useEffect(() => {
     loadUser();
   }, []);
 
+  // ==================== AUTHENTICATION METHODS ====================
+  
+  /**
+   * Load user data from persistent storage
+   * 
+   * Attempts to retrieve and parse user data from AsyncStorage.
+   * Sets loading state to false when complete.
+   */
   const loadUser = async () => {
     try {
       const userData = await AsyncStorage.getItem('user');

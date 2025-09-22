@@ -1,21 +1,57 @@
+/**
+ * Recommendation Service
+ * 
+ * Provides personalized movie and TV show recommendations based on user preferences.
+ * Uses machine learning algorithms to analyze user behavior and improve recommendations over time.
+ * 
+ * Features:
+ * - Genre-based recommendations
+ * - Content type preferences (movies vs TV shows)
+ * - Learning from user interactions
+ * - Error handling and fallback mechanisms
+ * 
+ * @author Flicksy Team
+ * @version 1.0.0
+ */
+
 import { Movie, TVShow, movieApi } from './movieApi';
 
+/**
+ * User preferences interface for recommendation system
+ */
 export interface UserPreferences {
-  genres: string[];
-  likedMovies: number[];
-  dislikedMovies: number[];
-  watchlist: number[];
+  genres: string[]; // User's preferred genres
+  likedMovies: number[]; // Array of liked movie IDs
+  dislikedMovies: number[]; // Array of disliked movie IDs
+  watchlist: number[]; // Array of watchlist item IDs
 }
 
+/**
+ * RecommendationService class
+ * 
+ * Handles all recommendation logic including learning from user preferences,
+ * generating personalized content, and managing recommendation quality.
+ */
 export class RecommendationService {
-  private genreWeights: Map<string, number> = new Map();
-  private typePreference: { movies: number; tvShows: number } = { movies: 0, tvShows: 0 };
-  private learningEnabled: boolean = true;
-  private errorCount: number = 0;
-  private maxErrors: number = 5;
-  private invalidIds: Set<number> = new Set(); // Track IDs that don't exist
+  // ==================== PRIVATE PROPERTIES ====================
+  
+  private genreWeights: Map<string, number> = new Map(); // Genre preference weights
+  private typePreference: { movies: number; tvShows: number } = { movies: 0, tvShows: 0 }; // Content type preferences
+  private learningEnabled: boolean = true; // Whether to learn from user interactions
+  private errorCount: number = 0; // Track consecutive errors
+  private maxErrors: number = 5; // Maximum errors before disabling learning
+  private invalidIds: Set<number> = new Set(); // Track IDs that don't exist in TMDB
 
-  // Update user preferences and learn from their choices
+  // ==================== PUBLIC METHODS ====================
+  
+  /**
+   * Update user preferences and learn from their choices
+   * 
+   * This method processes user preferences to improve future recommendations.
+   * It learns from both liked and disliked content to build a preference profile.
+   * 
+   * @param preferences - User's current preferences
+   */
   updatePreferences(preferences: UserPreferences) {
     // Only learn from preferences if there are valid items and learning is enabled
     if (this.learningEnabled && preferences.likedMovies.length > 0) {
