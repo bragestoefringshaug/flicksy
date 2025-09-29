@@ -173,8 +173,10 @@ class MovieApiService {
           console.error(`404 Error - Full URL: ${url}`);
           console.error(`Endpoint: ${endpoint}`);
           // For movie/TV endpoints, this might be a missing resource
-          if (endpoint.includes('/movie/') || endpoint.includes('/tv/')) {
-            throw new Error(`Movie/TV show not found: ${endpoint}. This content may not exist in TMDB database.`);
+          if (endpoint.includes('/movie/')) {
+            throw new Error(`Movie not found: ${endpoint}. This movie may not exist in TMDB database.`);
+          } else if (endpoint.includes('/tv/')) {
+            throw new Error(`TV show not found: ${endpoint}. This TV show may not exist in TMDB database.`);
           } else {
             throw new Error(`API endpoint not found: ${endpoint}. Please check the endpoint URL.`);
           }
@@ -400,6 +402,107 @@ class MovieApiService {
    */
   async getTVRecommendations(tvId: number, page: number = 1): Promise<TVResponse> {
     return this.makeRequest<TVResponse>(`/tv/${tvId}/recommendations?page=${page}`);
+  }
+
+  // ==================== VALIDATION METHODS ====================
+
+  /**
+   * Validate if a movie ID exists in TMDB database
+   * 
+   * @param movieId - The TMDB ID to validate
+   * @returns Promise<boolean> - True if movie exists, false otherwise
+   */
+  async validateMovieId(movieId: number): Promise<boolean> {
+    try {
+      await this.makeRequest<Movie>(`/movie/${movieId}`);
+      return true;
+    } catch (error) {
+      if (error instanceof Error && (error.message.includes('not found') || error.message.includes('Movie not found'))) {
+        console.log(`Movie ID ${movieId} does not exist in TMDB`);
+        return false;
+      }
+      // For other errors, we'll assume it might exist and let the caller handle it
+      console.warn(`Error validating movie ID ${movieId}:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Validate if a TV show ID exists in TMDB database
+   * 
+   * @param tvId - The TMDB ID to validate
+   * @returns Promise<boolean> - True if TV show exists, false otherwise
+   */
+  async validateTVShowId(tvId: number): Promise<boolean> {
+    try {
+      await this.makeRequest<TVShow>(`/tv/${tvId}`);
+      return true;
+    } catch (error) {
+      if (error instanceof Error && (error.message.includes('not found') || error.message.includes('TV show not found'))) {
+        console.log(`TV show ID ${tvId} does not exist in TMDB`);
+        return false;
+      }
+      // For other errors, we'll assume it might exist and let the caller handle it
+      console.warn(`Error validating TV show ID ${tvId}:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Validate if an ID exists as either a movie or TV show
+   * 
+   * @param id - The TMDB ID to validate
+   * @returns Promise<{exists: boolean, type: 'movie' | 'tv' | null}> - Validation result
+   */
+  async validateContentId(id: number): Promise<{exists: boolean, type: 'movie' | 'tv' | null}> {
+    try {
+      // Try movie first
+      const movieExists = await this.validateMovieId(id);
+      if (movieExists) {
+        return { exists: true, type: 'movie' };
+      }
+      
+      // Try TV show
+      const tvExists = await this.validateTVShowId(id);
+      if (tvExists) {
+        return { exists: true, type: 'tv' };
+      }
+      
+      return { exists: false, type: null };
+    } catch (error) {
+      console.warn(`Error validating content ID ${id}:`, error);
+      return { exists: false, type: null };
+    }
+  }
+
+  /**
+   * Filter out invalid movie/TV show IDs from a list
+   * 
+   * @param ids - Array of IDs to validate
+   * @returns Promise<number[]> - Array of valid IDs
+   */
+  async filterValidIds(ids: number[]): Promise<number[]> {
+    const validIds: number[] = [];
+    
+    // Process in batches to avoid overwhelming the API
+    const batchSize = 5;
+    for (let i = 0; i < ids.length; i += batchSize) {
+      const batch = ids.slice(i, i + batchSize);
+      const validationPromises = batch.map(async (id) => {
+        const result = await this.validateContentId(id);
+        return result.exists ? id : null;
+      });
+      
+      const batchResults = await Promise.all(validationPromises);
+      validIds.push(...batchResults.filter(id => id !== null) as number[]);
+      
+      // Small delay between batches to be respectful to the API
+      if (i + batchSize < ids.length) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }
+    
+    return validIds;
   }
 
   // ==================== UTILITY METHODS ====================

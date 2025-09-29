@@ -13,13 +13,13 @@
  * @version 1.0.0
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Dimensions,
-    StyleSheet,
-    View
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  StyleSheet,
+  View
 } from 'react-native';
 import MovieCard from '../components/MovieCard';
 import { ThemedText } from '../components/ThemedText';
@@ -48,6 +48,65 @@ export default function SwipeScreen() {
   const [isLoading, setIsLoading] = useState(true); // Initial loading state
   const [isLoadingMore, setIsLoadingMore] = useState(false); // Loading more cards state
   const [swipedCardIds, setSwipedCardIds] = useState<Set<number>>(new Set()); // Track swiped cards
+  const [recentlyShownIds, setRecentlyShownIds] = useState<Set<number>>(new Set()); // Track recently shown cards to prevent immediate repetition
+
+  // ==================== UTILITY FUNCTIONS ====================
+  
+  /**
+   * Shuffle an array using Fisher-Yates algorithm
+   * 
+   * @param array - Array to shuffle
+   * @returns T[] - New shuffled array (original array is not modified)
+   */
+  const shuffleArray = (array: any[]): any[] => {
+    const shuffled = [...array];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+  };
+  
+  /**
+   * Clean up invalid movie/TV show IDs from user preferences
+   * 
+   * This function validates all IDs in the user's preferences and removes
+   * any that don't exist in the TMDB database to prevent API errors.
+   */
+  const cleanupInvalidUserPreferences = async () => {
+    if (!user) return;
+    
+    try {
+      console.log('Cleaning up invalid user preferences...');
+      
+      // Validate liked movies
+      const validLikedMovies = await movieApi.filterValidIds(user.preferences.likedMovies);
+      const invalidLikedMovies = user.preferences.likedMovies.filter(id => !validLikedMovies.includes(id));
+      
+      // Validate disliked movies
+      const validDislikedMovies = await movieApi.filterValidIds(user.preferences.dislikedMovies);
+      const invalidDislikedMovies = user.preferences.dislikedMovies.filter(id => !validDislikedMovies.includes(id));
+      
+      // Validate watchlist
+      const validWatchlist = await movieApi.filterValidIds(user.preferences.watchlist);
+      const invalidWatchlist = user.preferences.watchlist.filter(id => !validWatchlist.includes(id));
+      
+      // Update preferences if there were invalid IDs
+      if (invalidLikedMovies.length > 0 || invalidDislikedMovies.length > 0 || invalidWatchlist.length > 0) {
+        console.log(`Removing ${invalidLikedMovies.length} invalid liked movies, ${invalidDislikedMovies.length} invalid disliked movies, ${invalidWatchlist.length} invalid watchlist items`);
+        
+        await updatePreferences({
+          likedMovies: validLikedMovies,
+          dislikedMovies: validDislikedMovies,
+          watchlist: validWatchlist
+        });
+        
+        console.log('User preferences cleaned up successfully');
+      }
+    } catch (error) {
+      console.error('Error cleaning up user preferences:', error);
+    }
+  };
 
   // ==================== EFFECTS ====================
   
@@ -67,17 +126,36 @@ export default function SwipeScreen() {
   useEffect(() => {
     if (cardStack.length < 5 && allCards.length > 0) {
       console.log(`Card stack has ${cardStack.length} cards, refilling to 5...`);
-      const availableCards = allCards.filter(card => !swipedCardIds.has(card.id));
+      const availableCards = allCards.filter(card => 
+        !swipedCardIds.has(card.id) && !recentlyShownIds.has(card.id)
+      );
       const cardsNotInStack = availableCards.filter(card => 
         !cardStack.some(stackCard => stackCard.id === card.id)
       );
       
       if (cardsNotInStack.length > 0) {
-        const cardsToAdd = cardsNotInStack.slice(0, 5 - cardStack.length);
+        // Shuffle available cards to add randomness
+        const shuffledCards = shuffleArray(cardsNotInStack);
+        const cardsToAdd = shuffledCards.slice(0, 5 - cardStack.length);
         setCardStack(prevStack => [...prevStack, ...cardsToAdd]);
+        
+        // Add new cards to recently shown tracking
+        setRecentlyShownIds(prev => {
+          const newSet = new Set(prev);
+          cardsToAdd.forEach(card => newSet.add(card.id));
+          return newSet;
+        });
+      } else {
+        // No more available cards, trigger loading more
+        console.log('No more available cards, loading more...');
+        loadMoreCards();
       }
+    } else if (cardStack.length < 5 && allCards.length === 0) {
+      // No cards at all, reload everything
+      console.log('No cards available, reloading...');
+      loadInitialCards();
     }
-  }, [cardStack.length, allCards, swipedCardIds, cardStack]);
+  }, [cardStack.length, allCards, swipedCardIds, cardStack, recentlyShownIds]);
 
   /**
    * Load initial cards for the swipe interface
@@ -92,19 +170,36 @@ export default function SwipeScreen() {
       let initialCards: (Movie | TVShow)[] = [];
       
       if (user && user.preferences.likedMovies.length > 0) {
+        // Clean up invalid IDs from user preferences first
+        await cleanupInvalidUserPreferences();
+        
         // Use personalized recommendations if user has preferences
+        const swipedIdsArray = Array.from(swipedCardIds);
         initialCards = await recommendationService.getPersonalizedRecommendations(
           user.preferences,
-          30
+          50, // Load more cards initially for better diversity
+          swipedIdsArray
         );
       } else {
-        // Use general popular content for new users
-        initialCards = await movieApi.getMixedContent(1);
+        // Use general popular content for new users - load from multiple pages
+        const [page1, page2, page3] = await Promise.all([
+          movieApi.getMixedContent(1),
+          movieApi.getMixedContent(2),
+          movieApi.getMixedContent(3)
+        ]);
+        const allContent = [...page1, ...page2, ...page3];
+        
+        // Filter out swiped cards for new users too
+        const swipedIdsArray = Array.from(swipedCardIds);
+        initialCards = allContent.filter(card => !swipedIdsArray.includes(card.id));
       }
       
-      setAllCards(initialCards);
+      // Shuffle the initial cards for better randomness
+      const shuffledCards = shuffleArray(initialCards);
+      
+      setAllCards(shuffledCards);
       // Initialize card stack with first 5 cards
-      setCardStack(initialCards.slice(0, 5));
+      setCardStack(shuffledCards.slice(0, 5));
     } catch (error) {
       console.error('Error loading initial cards:', error);
       Alert.alert('Error', 'Failed to load movies and TV shows');
@@ -121,20 +216,47 @@ export default function SwipeScreen() {
       let newCards: (Movie | TVShow)[] = [];
       
       if (user && user.preferences.likedMovies.length > 0) {
-        // Use personalized recommendations
+        // Clean up invalid IDs before getting recommendations
+        await cleanupInvalidUserPreferences();
+        
+        // Use personalized recommendations with more diversity
+        const swipedIdsArray = Array.from(swipedCardIds);
         newCards = await recommendationService.getPersonalizedRecommendations(
           user.preferences,
-          20
+          30, // Load more cards for better variety
+          swipedIdsArray
         );
       } else {
-        // Use general content
-        const nextPage = Math.floor(allCards.length / 20) + 1;
-        newCards = await movieApi.getMixedContent(nextPage);
+        // Use general content from multiple pages for better diversity
+        const currentPage = Math.floor(allCards.length / 20) + 1;
+        const [page1, page2] = await Promise.all([
+          movieApi.getMixedContent(currentPage),
+          movieApi.getMixedContent(currentPage + 1)
+        ]);
+        const allNewContent = [...page1, ...page2];
+        
+        // Filter out swiped cards
+        const swipedIdsArray = Array.from(swipedCardIds);
+        newCards = allNewContent.filter(card => !swipedIdsArray.includes(card.id));
       }
       
-      setAllCards(prev => [...prev, ...newCards]);
+      // Filter out cards that are recently shown (swiped cards already filtered above)
+      const filteredNewCards = newCards.filter(card => 
+        !recentlyShownIds.has(card.id)
+      );
+      
+      // Shuffle new cards before adding to prevent clustering
+      const shuffledNewCards = shuffleArray(filteredNewCards);
+      setAllCards(prev => [...prev, ...shuffledNewCards]);
+      
+      console.log(`Loaded ${shuffledNewCards.length} new cards (filtered from ${newCards.length} total, excluded ${newCards.length - filteredNewCards.length} recently shown)`);
     } catch (error) {
       console.error('Error loading more cards:', error);
+      // If loading fails, try to reload everything
+      if (allCards.length === 0) {
+        console.log('Loading failed and no cards available, attempting full reload...');
+        loadInitialCards();
+      }
     } finally {
       setIsLoadingMore(false);
     }
@@ -145,18 +267,30 @@ export default function SwipeScreen() {
       const newStack = prevStack.slice(1); // Remove the top card
       
       // Add the next recommended card to maintain 5 cards
-      const availableCards = allCards.filter(card => !swipedCardIds.has(card.id));
-      const nextCard = availableCards.find(card => 
+      const availableCards = allCards.filter(card => 
+        !swipedCardIds.has(card.id) && !recentlyShownIds.has(card.id)
+      );
+      const cardsNotInStack = availableCards.filter(card => 
         !newStack.some(stackCard => stackCard.id === card.id)
       );
       
-      if (nextCard) {
+      if (cardsNotInStack.length > 0) {
+        // Shuffle available cards to add randomness
+        const shuffledCards = shuffleArray(cardsNotInStack);
+        const nextCard = shuffledCards[0];
         newStack.push(nextCard);
+        
+        // Add to recently shown tracking
+        setRecentlyShownIds(prev => new Set([...prev, nextCard.id]));
+      } else {
+        // No more cards available, trigger loading more
+        console.log('No more cards available in moveToNextCard, triggering loadMoreCards');
+        loadMoreCards();
       }
       
       return newStack;
     });
-  }, [allCards, swipedCardIds]);
+  }, [allCards, swipedCardIds, recentlyShownIds]);
 
   const handleSwipeLeft = useCallback(async (item: Movie | TVShow) => {
     console.log('handleSwipeLeft called with:', item);
@@ -209,8 +343,30 @@ export default function SwipeScreen() {
   }, [user, updatePreferences, moveToNextCard, allCards.length, swipedCardIds.size]);
 
   const handleRefresh = () => {
+    // Clear swiped cards and reload everything fresh
+    setSwipedCardIds(new Set());
+    setRecentlyShownIds(new Set());
+    setAllCards([]);
+    setCardStack([]);
     loadInitialCards();
   };
+
+  // Periodically clear recently shown cards to allow them to be shown again
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setRecentlyShownIds(prev => {
+        // Keep only the last 20 recently shown cards to prevent memory buildup
+        const recentArray = Array.from(prev);
+        if (recentArray.length > 20) {
+          const keepRecent = recentArray.slice(-20);
+          return new Set(keepRecent);
+        }
+        return prev;
+      });
+    }, 30000); // Clear every 30 seconds
+
+    return () => clearInterval(interval);
+  }, []);
 
   if (isLoading) {
     return (
@@ -222,10 +378,19 @@ export default function SwipeScreen() {
   }
 
   if (cardStack.length === 0) {
+    // If we have no cards and we're not loading, try to reload
+    if (!isLoading && !isLoadingMore) {
+      console.log('Card stack is empty and not loading, attempting to reload...');
+      loadInitialCards();
+    }
+    
     return (
       <ThemedView style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#007AFF" />
         <ThemedText style={styles.loadingText}>Finding great picks for you...</ThemedText>
+        <ThemedText style={styles.loadingSubtext}>
+          {isLoading ? 'Loading content...' : 'Refreshing recommendations...'}
+        </ThemedText>
       </ThemedView>
     );
   }
@@ -278,6 +443,11 @@ const styles = StyleSheet.create({
     marginTop: 16,
     fontSize: 16,
     color: '#666',
+  },
+  loadingSubtext: {
+    marginTop: 8,
+    fontSize: 14,
+    color: '#999',
   },
   emptyContainer: {
     flex: 1,
