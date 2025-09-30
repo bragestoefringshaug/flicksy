@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Dimensions,
-  StyleSheet,
-  View
+    ActivityIndicator,
+    Alert,
+    Dimensions,
+    StyleSheet,
+    View
 } from 'react-native';
 import MovieCard from '../components/MovieCard';
 import { ThemedText } from '../components/ThemedText';
@@ -48,7 +48,7 @@ export default function SwipeScreen() {
       setIsLoading(true);
       let initialCards: (Movie | TVShow)[] = [];
       
-      if (user && user.preferences.likedMovies.length > 0) {
+      if (user && (user.preferences.likedMovies.length > 0 || user.preferences.genres.length > 0)) {
         // Use personalized recommendations if user has preferences
         initialCards = await recommendationService.getPersonalizedRecommendations(
           user.preferences,
@@ -77,7 +77,7 @@ export default function SwipeScreen() {
       setIsLoadingMore(true);
       let newCards: (Movie | TVShow)[] = [];
       
-      if (user && user.preferences.likedMovies.length > 0) {
+      if (user && (user.preferences.likedMovies.length > 0 || user.preferences.genres.length > 0)) {
         // Use personalized recommendations
         newCards = await recommendationService.getPersonalizedRecommendations(
           user.preferences,

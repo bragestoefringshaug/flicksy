@@ -25,6 +25,24 @@ export class RecommendationService {
       this.learnFromDislikedContent(preferences.dislikedMovies);
     }
     this.updateTypePreferences(preferences);
+    // Seed genre weights from explicitly selected genres
+    this.seedExplicitGenrePreferences(preferences.genres).catch((e) => {
+      console.warn('Failed to seed genre preferences:', e);
+    });
+  }
+
+  private async seedExplicitGenrePreferences(genreNames: string[]) {
+    if (!genreNames || genreNames.length === 0) return;
+    try {
+      const ids = await movieApi.mapGenreNamesToIds(genreNames);
+      // Give a baseline positive weight for selected genres
+      for (const id of ids) {
+        this.updateGenreWeights([id], 2);
+      }
+    } catch (e) {
+      // Non-fatal; just log
+      console.warn('Error mapping genre names to ids:', e);
+    }
   }
 
   // Learn from liked content to improve recommendations
