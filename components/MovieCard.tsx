@@ -181,7 +181,7 @@ export default function MovieCard({
       bottom: 0,
       left: 0,
       right: 0,
-      height: '45%',
+      height: '60%',
     },
     content: {
       position: 'absolute',
@@ -315,6 +315,31 @@ export default function MovieCard({
     likeButton: {
       backgroundColor: '#4CAF50',
     },
+    typeBadge: { marginLeft: 8, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12 },
+    typeText: { fontSize: isSmallDevice ? 10 : isLargeDevice ? 12 : 11, fontWeight: '600', color: '#fff' },
+
+    infoHint: {
+      position: 'absolute',
+      top: isSmallDevice ? 10 : isLargeDevice ? 18 : 14,
+      right: isSmallDevice ? 10 : isLargeDevice ? 18 : 14,
+      alignItems: 'center',
+      backgroundColor: 'rgba(0,0,0,0.35)',
+      paddingHorizontal: 8,
+      paddingVertical: 6,
+      borderRadius: 12,
+      zIndex: 5,
+    },
+    infoHintIconRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 2,
+    },
+    infoHintText: {
+      color: '#fff',
+      fontSize: isSmallDevice ? 9 : isLargeDevice ? 11 : 10,
+      fontWeight: '600',
+      opacity: 0.9,
+    },
     backFace: {
       position: 'absolute',
       top: 0,
@@ -345,6 +370,12 @@ export default function MovieCard({
       fontSize: isSmallDevice ? 16 : isLargeDevice ? 20 : 18,
       fontWeight: '600',
     },
+    backHeader: {
+      flexDirection: 'row',
+      alignItems: 'baseline',
+      gap: 8,
+      marginBottom: 8,
+    },
     backMetaRow: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -374,6 +405,11 @@ export default function MovieCard({
       textAlign: 'center',
       marginTop: 16,
       fontSize: isSmallDevice ? 12 : isLargeDevice ? 16 : 14,
+    },
+    backHintContainer: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginTop: 8,
     },
     frontFace: {
       backfaceVisibility: 'hidden',
@@ -681,14 +717,26 @@ export default function MovieCard({
         />
         
         <LinearGradient
-          colors={['transparent', 'rgba(0,0,0,0.8)']}
+          colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.6)', 'rgba(0,0,0,1)']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
           style={styles.gradient}
         />
+
+        <View style={styles.infoHint}>
+          <View style={styles.infoHintIconRow}>
+            <Ionicons name="return-up-forward-outline" size={16} color="#fff" style={{ marginLeft: 4, opacity: 0.9 }} />
+          </View>
+          <Text style={styles.infoHintText}>Tap to show info</Text>
+        </View>
 
         <View style={styles.content}>
           <View style={styles.header}>
             <Text style={styles.title}>{title}</Text>
             <Text style={styles.year}>({year})</Text>
+            <View style={[styles.typeBadge, { backgroundColor: isMovie ? '#007AFF' : '#34C759' }]}>
+              <Text style={styles.typeText}>{isMovie ? 'Movie' : 'TV Show'}</Text>
+            </View>
           </View>
 
           <View style={styles.ratingContainer}>
@@ -756,12 +804,18 @@ export default function MovieCard({
             { transform: [{ perspective: 1000 }, { rotateY: backRotateY }] },
           ]}
         >
-          <View style={styles.backContent}>
-            <Text style={styles.backTitle}>{title} <Text style={styles.backYear}>({year})</Text></Text>
-            <View style={styles.backMetaRow}>
-              <Ionicons name="star" size={16} color="#FFD700" />
-              <Text style={styles.backMetaText}>{item.vote_average.toFixed(1)} · {item.vote_count} votes</Text>
-            </View>
+                        <View style={styles.backContent}>
+              <View style={styles.backHeader}>
+                <Text style={styles.backTitle}>{title}</Text>
+                <Text style={styles.backYear}>({year})</Text>
+                <View style={[styles.typeBadge, { backgroundColor: isMovie ? '#007AFF' : '#34C759' }]}>
+                  <Text style={styles.typeText}>{isMovie ? 'Movie' : 'TV Show'}</Text>
+                </View>
+              </View>
+              <View style={styles.backMetaRow}>
+                <Ionicons name="star" size={16} color="#FFD700" />
+                <Text style={styles.backMetaText}>{item.vote_average.toFixed(1)} · {item.vote_count} votes</Text>
+              </View>
             <View style={styles.backMetaRow}>
               <Text style={styles.backMetaText}>Language: {item.original_language.toUpperCase()}</Text>
             </View>
@@ -770,7 +824,10 @@ export default function MovieCard({
             </View>
             <View style={styles.backDivider} />
             <Text style={styles.backOverview}>{item.overview || 'No description available.'}</Text>
-            <Text style={styles.backHint}>Tap to flip back</Text>
+            <View style={styles.backHintContainer}>
+              <Text style={styles.backHint}>Tap to flip back</Text>
+              <Ionicons name="return-up-back-outline" size={18} color="#fff" style={{ marginTop: 6, opacity: 0.9 }} />
+            </View>
           </View>
         </Animated.View>
       </View>
