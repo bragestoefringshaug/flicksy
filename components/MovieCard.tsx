@@ -15,7 +15,7 @@
 
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import {
   Animated,
   Dimensions,
@@ -416,109 +416,6 @@ export default function MovieCard({
     },
   });
 
-  // PanResponder for web
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: (evt) => {
-        if (isFlipped) return false;
-        if (!isTopCard) return false;
-        
-        // Check if touch is on action buttons (bottom 80px of card)
-        const { locationY } = evt.nativeEvent;
-        const isOnButtons = locationY > cardHeight - 80;
-        
-        return !isOnButtons;
-      },
-      onMoveShouldSetPanResponder: () => isTopCard && !isFlipped,
-      onPanResponderGrant: () => {
-        console.log('Pan responder granted');
-      },
-      onPanResponderMove: (_, gestureState) => {
-        if (isTopCard) {
-          dragX.setValue(gestureState.dx);
-          dragY.setValue(gestureState.dy);
-          rotation.setValue(gestureState.dx / screenWidth * 15);
-        }
-      },
-      onPanResponderRelease: (_, gestureState) => {
-        if (!isTopCard) return;
-        
-        console.log('Pan responder release:', gestureState);
-        const { dx, vx } = gestureState;
-        const swipeThreshold = screenWidth * 0.3;
-        const velocityThreshold = 500;
-
-        if (dx > swipeThreshold || vx > velocityThreshold) {
-          // Swipe right - Like
-          console.log('Swipe right detected');
-          swipeRight();
-        } else if (dx < -swipeThreshold || vx < -velocityThreshold) {
-          // Swipe left - Dislike
-          console.log('Swipe left detected');
-          swipeLeft();
-        } else {
-          // Return to center
-          console.log('Returning to center');
-          returnToCenter();
-        }
-      },
-    })
-  ).current;
-
-  // PanGestureHandler for mobile
-  const onGestureEvent = Animated.event(
-    [
-      { 
-        nativeEvent: { 
-          translationX: dragX, 
-          translationY: dragY 
-        } 
-      }
-    ],
-    { 
-      useNativeDriver: false,
-      listener: (event: any) => {
-        if (isTopCard && !isFlipped) {
-          const translationX = event.nativeEvent.translationX;
-          rotation.setValue(translationX / screenWidth * 15);
-        }
-      }
-    }
-  );
-
-  /**
-   * Handle gesture state changes for swipe detection
-   * 
-   * This function is called when the user finishes a gesture (pan gesture).
-   * It determines whether the user swiped left, right, or just tapped based on
-   * the translation distance and velocity of the gesture.
-   * 
-   * @param event - Gesture event containing translation and velocity data
-   */
-  const onHandlerStateChange = (event: any) => {
-    if (!isTopCard || isFlipped) return;
-    
-    if (event.nativeEvent.state === State.END) {
-      const { translationX, velocityX } = event.nativeEvent;
-      const swipeThreshold = screenWidth * 0.3; // 30% of screen width
-      const velocityThreshold = 500; // Minimum velocity for quick swipes
-
-      if (translationX > swipeThreshold || velocityX > velocityThreshold) {
-        // Swipe right - Like
-        console.log('Swipe right detected (mobile)');
-        swipeRight();
-      } else if (translationX < -swipeThreshold || velocityX < -velocityThreshold) {
-        // Swipe left - Dislike
-        console.log('Swipe left detected (mobile)');
-        swipeLeft();
-      } else {
-        // Return to center
-        console.log('Returning to center (mobile)');
-        returnToCenter();
-      }
-    }
-  };
-
   /**
    * Handle swipe right gesture (Like action)
    * 
@@ -606,6 +503,120 @@ export default function MovieCard({
         useNativeDriver: false,
       }),
     ]).start();
+  };
+
+  // PanResponder for web - recreate when isTopCard changes
+  const panResponder = useMemo(() => 
+    PanResponder.create({
+      onStartShouldSetPanResponder: (evt) => {
+        console.log('onStartShouldSetPanResponder called, isTopCard:', isTopCard, 'isFlipped:', isFlipped);
+        if (isFlipped) return false;
+        if (!isTopCard) return false;
+        
+        // Check if touch is on action buttons (bottom 80px of card)
+        const { locationY } = evt.nativeEvent;
+        const isOnButtons = locationY > cardHeight - 80;
+        
+        return !isOnButtons;
+      },
+      onMoveShouldSetPanResponder: () => {
+        console.log('onMoveShouldSetPanResponder called, isTopCard:', isTopCard, 'isFlipped:', isFlipped);
+        return isTopCard && !isFlipped;
+      },
+      onPanResponderGrant: () => {
+        console.log('Pan responder granted for card:', 'title' in item ? item.title : item.name);
+      },
+      onPanResponderMove: (_, gestureState) => {
+        if (isTopCard) {
+          dragX.setValue(gestureState.dx);
+          dragY.setValue(gestureState.dy);
+          rotation.setValue(gestureState.dx / screenWidth * 15);
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (!isTopCard) {
+          console.log('Pan responder release ignored - not top card');
+          return;
+        }
+        
+        console.log('Pan responder release:', gestureState);
+        const { dx, vx } = gestureState;
+        const swipeThreshold = screenWidth * 0.3;
+        const velocityThreshold = 500;
+
+        if (dx > swipeThreshold || vx > velocityThreshold) {
+          // Swipe right - Like
+          console.log('Swipe right detected');
+          swipeRight();
+        } else if (dx < -swipeThreshold || vx < -velocityThreshold) {
+          // Swipe left - Dislike
+          console.log('Swipe left detected');
+          swipeLeft();
+        } else {
+          // Return to center
+          console.log('Returning to center');
+          returnToCenter();
+        }
+      },
+    }), [isTopCard, isFlipped, cardHeight, screenWidth, swipeRight, swipeLeft, returnToCenter, item]
+  );
+
+  // PanGestureHandler for mobile
+  const onGestureEvent = Animated.event(
+    [
+      { 
+        nativeEvent: { 
+          translationX: dragX, 
+          translationY: dragY 
+        } 
+      }
+    ],
+    { 
+      useNativeDriver: false,
+      listener: (event: any) => {
+        if (isTopCard && !isFlipped) {
+          const translationX = event.nativeEvent.translationX;
+          rotation.setValue(translationX / screenWidth * 15);
+        }
+      }
+    }
+  );
+
+  /**
+   * Handle gesture state changes for swipe detection
+   * 
+   * This function is called when the user finishes a gesture (pan gesture).
+   * It determines whether the user swiped left, right, or just tapped based on
+   * the translation distance and velocity of the gesture.
+   * 
+   * @param event - Gesture event containing translation and velocity data
+   */
+  const onHandlerStateChange = (event: any) => {
+    console.log('onHandlerStateChange called, isTopCard:', isTopCard, 'isFlipped:', isFlipped, 'state:', event.nativeEvent.state);
+    if (!isTopCard || isFlipped) {
+      console.log('onHandlerStateChange ignored - not top card or flipped');
+      return;
+    }
+    
+    if (event.nativeEvent.state === State.END) {
+      const { translationX, velocityX } = event.nativeEvent;
+      const swipeThreshold = screenWidth * 0.3; // 30% of screen width
+      const velocityThreshold = 500; // Minimum velocity for quick swipes
+
+      if (translationX > swipeThreshold || velocityX > velocityThreshold) {
+        // Swipe right - Like
+        console.log('Swipe right detected (mobile)');
+        swipeRight();
+      } else if (translationX < -swipeThreshold || velocityX < -velocityThreshold) {
+        // Swipe left - Dislike
+        console.log('Swipe left detected (mobile)');
+        swipeLeft();
+      } else {
+        // Return to center
+        console.log('Returning to center (mobile)');
+        returnToCenter();
+      }
+    }
   };
 
   const resetCard = () => {
@@ -853,6 +864,7 @@ export default function MovieCard({
           onGestureEvent={onGestureEvent}
           onHandlerStateChange={onHandlerStateChange}
           enabled={isTopCard && !isFlipped}
+          shouldCancelWhenOutside={false}
         >
           <View collapsable={false}>
             {cardInner}

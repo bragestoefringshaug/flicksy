@@ -1,9 +1,9 @@
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useRouter } from 'expo-router';
-import React, { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Alert, FlatList, Pressable, StyleSheet, View } from 'react-native';
-import { useAuth } from '../../../contexts/AuthContext';
+import { useAuth } from '../contexts/AuthContext';
 
 const ALL_GENRES = [
   'Action',
@@ -47,8 +47,8 @@ export default function PreferencesScreen() {
       setIsSaving(true);
       await updatePreferences({ genres: Array.from(selected) });
       Alert.alert('Saved', 'Your preferences have been updated.');
-      // Navigate to Discover tab after saving
-      router.replace('/(tabs)');
+      // Navigate back to profile screen after saving
+      router.back();
     } catch (e: any) {
       Alert.alert('Error', e?.message ?? 'Failed to save preferences');
     } finally {
@@ -142,5 +142,3 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
-
-

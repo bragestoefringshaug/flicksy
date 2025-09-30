@@ -1,12 +1,12 @@
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { ActivityIndicator, StyleSheet } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import LoginScreen from '../../screens/LoginScreen';
 import RegisterScreen from '../../screens/RegisterScreen';
 import SwipeScreen from '../../screens/SwipeScreen';
-import PreferencesScreen from './preferences';
+import PreferencesScreen from '../preferences';
 
 export default function HomeScreen() {
   const { user, isLoading } = useAuth();
