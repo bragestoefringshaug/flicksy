@@ -1,3 +1,18 @@
+/**
+ * MovieCard Component
+ * 
+ * A swipeable card component that displays movie or TV show information.
+ * Features include:
+ * - Swipe gestures (left/right) for user interaction
+ * - Animated transitions and positioning
+ * - Responsive design for different screen sizes
+ * - Genre display and image handling
+ * - Like/Dislike buttons with haptic feedback
+ * 
+ * @author Flicksy Team
+ * @version 1.0.0
+ */
+
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useRef } from 'react';
@@ -17,28 +32,50 @@ import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Movie, movieApi, TVShow } from '../services/movieApi';
 
+// Screen dimensions for responsive design
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 const CARD_WIDTH = screenWidth;
 
+/**
+ * Props interface for MovieCard component
+ */
 interface MovieCardProps {
-  item: Movie | TVShow;
-  onSwipeLeft: () => void;
-  onSwipeRight: () => void;
-  isTopCard: boolean;
-  isNextCard?: boolean;
-  isThirdCard?: boolean;
-  isFourthCard?: boolean;
-  isFifthCard?: boolean;
+  item: Movie | TVShow; // The movie or TV show data to display
+  onSwipeLeft: () => void; // Callback when user swipes left (dislike)
+  onSwipeRight: () => void; // Callback when user swipes right (like)
+  isTopCard: boolean; // Whether this is the top card in the stack
+  isNextCard?: boolean; // Whether this is the second card
+  isThirdCard?: boolean; // Whether this is the third card
+  isFourthCard?: boolean; // Whether this is the fourth card
+  isFifthCard?: boolean; // Whether this is the fifth card
 }
 
-export default function MovieCard({ item, onSwipeLeft, onSwipeRight, isTopCard, isNextCard = false, isThirdCard = false, isFourthCard = false, isFifthCard = false }: MovieCardProps) {
-  const insets = useSafeAreaInsets();
-  const cardHeight = Math.max(0, screenHeight);
+/**
+ * MovieCard Component
+ * 
+ * Main component that renders a swipeable movie/TV show card with interactive features.
+ * Handles gestures, animations, and responsive design for different screen sizes.
+ */
+export default function MovieCard({ 
+  item, 
+  onSwipeLeft, 
+  onSwipeRight, 
+  isTopCard, 
+  isNextCard = false, 
+  isThirdCard = false, 
+  isFourthCard = false, 
+  isFifthCard = false 
+}: MovieCardProps) {
+  // ==================== HOOKS AND STATE ====================
   
+  const insets = useSafeAreaInsets(); // Safe area insets for device-specific spacing
+  const cardHeight = Math.max(0, screenHeight); // Full screen height for the card
+  
+  // ==================== RESPONSIVE DESIGN CALCULATIONS ====================
   
   // Calculate responsive positioning based on device dimensions
-  const isSmallDevice = screenHeight < 700;
-  const isLargeDevice = screenHeight > 900;
+  const isSmallDevice = screenHeight < 700; // Small phones (iPhone SE, etc.)
+  const isLargeDevice = screenHeight > 900; // Large phones (iPhone Pro Max, etc.)
   
   // Dynamic spacing based on device size
   const baseSpacing = isSmallDevice ? 15 : isLargeDevice ? 25 : 20;
@@ -52,23 +89,33 @@ export default function MovieCard({ item, onSwipeLeft, onSwipeRight, isTopCard, 
   // Content positioning - above buttons with proper spacing
   const contentSpacing = buttonSpacing + (isSmallDevice ? 70 : isLargeDevice ? 90 : 80);
   
+  // ==================== ANIMATION STATE ====================
+  
   // Separate animated values for different purposes
-  const dragX = useRef(new Animated.Value(0)).current;
-  const dragY = useRef(new Animated.Value(0)).current;
-  const rotation = useRef(new Animated.Value(0)).current;
-  const scale = useRef(new Animated.Value(1)).current;
-  const opacity = useRef(new Animated.Value(1)).current;
-  const flip = useRef(new Animated.Value(0)).current;
-  const [isFlipped, setIsFlipped] = React.useState(false);
+  const dragX = useRef(new Animated.Value(0)).current; // Horizontal drag position
+  const dragY = useRef(new Animated.Value(0)).current; // Vertical drag position
+  const rotation = useRef(new Animated.Value(0)).current; // Card rotation during swipe
+  const scale = useRef(new Animated.Value(1)).current; // Card scale for visual feedback
+  const opacity = useRef(new Animated.Value(1)).current; // Card opacity for fade effects
+  const flip = useRef(new Animated.Value(0)).current; // Card flip animation (front/back)
+  const [isFlipped, setIsFlipped] = React.useState(false); // Track flip state
 
-  // Reset card when it becomes the top card
+  // ==================== EFFECTS ====================
+  
+  /**
+   * Reset card animation when it becomes the top card
+   * This ensures smooth transitions when cards move up in the stack
+   */
   useEffect(() => {
     if (isTopCard) {
       resetCard();
     }
   }, [isTopCard]);
 
-  const isMovie = 'title' in item;
+  // ==================== DATA PROCESSING ====================
+  
+  // Determine if the item is a movie or TV show and extract relevant data
+  const isMovie = 'title' in item; // Movies have 'title', TV shows have 'name'
   const title = isMovie ? item.title : item.name;
   const releaseDate = isMovie ? item.release_date : item.first_air_date;
   const year = releaseDate ? new Date(releaseDate).getFullYear() : 'N/A';
@@ -134,7 +181,7 @@ export default function MovieCard({ item, onSwipeLeft, onSwipeRight, isTopCard, 
       bottom: 0,
       left: 0,
       right: 0,
-      height: '45%',
+      height: '60%',
     },
     content: {
       position: 'absolute',
@@ -268,6 +315,31 @@ export default function MovieCard({ item, onSwipeLeft, onSwipeRight, isTopCard, 
     likeButton: {
       backgroundColor: '#4CAF50',
     },
+    typeBadge: { marginLeft: 8, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12 },
+    typeText: { fontSize: isSmallDevice ? 10 : isLargeDevice ? 12 : 11, fontWeight: '600', color: '#fff' },
+
+    infoHint: {
+      position: 'absolute',
+      top: isSmallDevice ? 10 : isLargeDevice ? 18 : 14,
+      right: isSmallDevice ? 10 : isLargeDevice ? 18 : 14,
+      alignItems: 'center',
+      backgroundColor: 'rgba(0,0,0,0.35)',
+      paddingHorizontal: 8,
+      paddingVertical: 6,
+      borderRadius: 12,
+      zIndex: 5,
+    },
+    infoHintIconRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 2,
+    },
+    infoHintText: {
+      color: '#fff',
+      fontSize: isSmallDevice ? 9 : isLargeDevice ? 11 : 10,
+      fontWeight: '600',
+      opacity: 0.9,
+    },
     backFace: {
       position: 'absolute',
       top: 0,
@@ -298,6 +370,12 @@ export default function MovieCard({ item, onSwipeLeft, onSwipeRight, isTopCard, 
       fontSize: isSmallDevice ? 16 : isLargeDevice ? 20 : 18,
       fontWeight: '600',
     },
+    backHeader: {
+      flexDirection: 'row',
+      alignItems: 'baseline',
+      gap: 8,
+      marginBottom: 8,
+    },
     backMetaRow: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -327,6 +405,11 @@ export default function MovieCard({ item, onSwipeLeft, onSwipeRight, isTopCard, 
       textAlign: 'center',
       marginTop: 16,
       fontSize: isSmallDevice ? 12 : isLargeDevice ? 16 : 14,
+    },
+    backHintContainer: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginTop: 8,
     },
     frontFace: {
       backfaceVisibility: 'hidden',
@@ -403,13 +486,22 @@ export default function MovieCard({ item, onSwipeLeft, onSwipeRight, isTopCard, 
     }
   );
 
+  /**
+   * Handle gesture state changes for swipe detection
+   * 
+   * This function is called when the user finishes a gesture (pan gesture).
+   * It determines whether the user swiped left, right, or just tapped based on
+   * the translation distance and velocity of the gesture.
+   * 
+   * @param event - Gesture event containing translation and velocity data
+   */
   const onHandlerStateChange = (event: any) => {
     if (!isTopCard || isFlipped) return;
     
     if (event.nativeEvent.state === State.END) {
       const { translationX, velocityX } = event.nativeEvent;
-      const swipeThreshold = screenWidth * 0.3;
-      const velocityThreshold = 500;
+      const swipeThreshold = screenWidth * 0.3; // 30% of screen width
+      const velocityThreshold = 500; // Minimum velocity for quick swipes
 
       if (translationX > swipeThreshold || velocityX > velocityThreshold) {
         // Swipe right - Like
@@ -427,6 +519,12 @@ export default function MovieCard({ item, onSwipeLeft, onSwipeRight, isTopCard, 
     }
   };
 
+  /**
+   * Handle swipe right gesture (Like action)
+   * 
+   * Animates the card off-screen to the right with spring animation and rotation,
+   * then calls the onSwipeRight callback to notify the parent component.
+   */
   const swipeRight = () => {
     console.log('swipeRight called');
     if (isFlipped) {
@@ -619,14 +717,26 @@ export default function MovieCard({ item, onSwipeLeft, onSwipeRight, isTopCard, 
         />
         
         <LinearGradient
-          colors={['transparent', 'rgba(0,0,0,0.8)']}
+          colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.6)', 'rgba(0,0,0,1)']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
           style={styles.gradient}
         />
+
+        <View style={styles.infoHint}>
+          <View style={styles.infoHintIconRow}>
+            <Ionicons name="return-up-forward-outline" size={16} color="#fff" style={{ marginLeft: 4, opacity: 0.9 }} />
+          </View>
+          <Text style={styles.infoHintText}>Tap to show info</Text>
+        </View>
 
         <View style={styles.content}>
           <View style={styles.header}>
             <Text style={styles.title}>{title}</Text>
             <Text style={styles.year}>({year})</Text>
+            <View style={[styles.typeBadge, { backgroundColor: isMovie ? '#007AFF' : '#34C759' }]}>
+              <Text style={styles.typeText}>{isMovie ? 'Movie' : 'TV Show'}</Text>
+            </View>
           </View>
 
           <View style={styles.ratingContainer}>
@@ -694,12 +804,18 @@ export default function MovieCard({ item, onSwipeLeft, onSwipeRight, isTopCard, 
             { transform: [{ perspective: 1000 }, { rotateY: backRotateY }] },
           ]}
         >
-          <View style={styles.backContent}>
-            <Text style={styles.backTitle}>{title} <Text style={styles.backYear}>({year})</Text></Text>
-            <View style={styles.backMetaRow}>
-              <Ionicons name="star" size={16} color="#FFD700" />
-              <Text style={styles.backMetaText}>{item.vote_average.toFixed(1)} · {item.vote_count} votes</Text>
-            </View>
+                        <View style={styles.backContent}>
+              <View style={styles.backHeader}>
+                <Text style={styles.backTitle}>{title}</Text>
+                <Text style={styles.backYear}>({year})</Text>
+                <View style={[styles.typeBadge, { backgroundColor: isMovie ? '#007AFF' : '#34C759' }]}>
+                  <Text style={styles.typeText}>{isMovie ? 'Movie' : 'TV Show'}</Text>
+                </View>
+              </View>
+              <View style={styles.backMetaRow}>
+                <Ionicons name="star" size={16} color="#FFD700" />
+                <Text style={styles.backMetaText}>{item.vote_average.toFixed(1)} · {item.vote_count} votes</Text>
+              </View>
             <View style={styles.backMetaRow}>
               <Text style={styles.backMetaText}>Language: {item.original_language.toUpperCase()}</Text>
             </View>
@@ -708,7 +824,10 @@ export default function MovieCard({ item, onSwipeLeft, onSwipeRight, isTopCard, 
             </View>
             <View style={styles.backDivider} />
             <Text style={styles.backOverview}>{item.overview || 'No description available.'}</Text>
-            <Text style={styles.backHint}>Tap to flip back</Text>
+            <View style={styles.backHintContainer}>
+              <Text style={styles.backHint}>Tap to flip back</Text>
+              <Ionicons name="return-up-back-outline" size={18} color="#fff" style={{ marginTop: 6, opacity: 0.9 }} />
+            </View>
           </View>
         </Animated.View>
       </View>

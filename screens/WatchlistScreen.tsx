@@ -1,15 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    Image,
-    RefreshControl,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Image,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { ThemedText } from '../components/ThemedText';
 import { ThemedView } from '../components/ThemedView';
@@ -112,7 +112,10 @@ export default function WatchlistScreen() {
         
         <View style={styles.itemContent}>
           <View style={styles.itemHeader}>
-            <ThemedText style={styles.itemTitle} numberOfLines={2}>
+            <ThemedText
+              style={[styles.itemTitle, item.isMovie ? styles.movieTitle : styles.tvTitle]}
+              numberOfLines={2}
+            >
               {title}
             </ThemedText>
             <TouchableOpacity
@@ -263,6 +266,8 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 8,
   },
+  movieTitle: { color: '#007AFF' },
+  tvTitle: { color: '#34C759' },
   removeButton: {
     padding: 4,
   },
