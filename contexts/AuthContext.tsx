@@ -24,6 +24,7 @@ interface User {
     likedMovies: number[]; // Array of liked movie IDs
     dislikedMovies: number[]; // Array of disliked movie IDs
     watchlist: number[]; // Array of watchlist movie/TV show IDs
+    streamingServices?: string[]; // User's selected streaming services
   };
 }
 
@@ -138,6 +139,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           likedMovies: [],
           dislikedMovies: [],
           watchlist: [],
+          streamingServices: [],
         },
       };
 
