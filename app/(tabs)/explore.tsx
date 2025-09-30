@@ -1,15 +1,13 @@
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import React from 'react';
-import { router, type Href } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import {
-    Alert,
-    ScrollView,
-    StyleSheet,
-    TouchableOpacity,
-    View
+  Alert,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -80,11 +78,8 @@ export default function ProfileScreen() {
             <Ionicons name="chevron-forward" size={20} color="#ccc" />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem}>
-
           {/* Settings -> open the Streaming Services screen so users can update preferences later */}
           <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/streaming-services' as Href)}>
-
             <Ionicons name="settings-outline" size={24} color="#666" />
             <ThemedText style={styles.menuText}>Settings</ThemedText>
             <Ionicons name="chevron-forward" size={20} color="#ccc" />
