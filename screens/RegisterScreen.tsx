@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { router, type Href } from 'expo-router';
 import {
     Alert,
     KeyboardAvoidingView,
@@ -43,11 +44,16 @@ export default function RegisterScreen({ onSwitchToLogin }: RegisterScreenProps)
     }
 
     setIsLoading(true);
+    // Create the user account and sign them in
     const success = await register(email, password, name);
     setIsLoading(false);
 
     if (!success) {
       Alert.alert('Error', 'Email already exists or registration failed');
+    } else {
+      // After successful registration, take the user to
+      // the streaming services selection to set preferences immediately.
+      router.replace('/streaming-services' as Href);
     }
   };
 
