@@ -248,6 +248,31 @@ class MovieApiService {
     return names;
   }
 
+
+  async getGenreNameToIdMap(): Promise<Map<string, number>> {
+    await this.ensureGenreMap();
+    const result = new Map<string, number>();
+    if (!this.genreMap) return result;
+    for (const [id, name] of this.genreMap.entries()) {
+      result.set(name, id);
+    }
+    return result;
+  }
+
+  async mapGenreNamesToIds(names: string[]): Promise<number[]> {
+    await this.ensureGenreMap();
+    if (!this.genreMap) return [];
+    const nameToId = await this.getGenreNameToIdMap();
+    const ids: number[] = [];
+    for (const name of names) {
+      const id = nameToId.get(name);
+      if (typeof id === 'number') ids.push(id);
+    }
+    return ids;
+  }
+
+  // Get popular movies
+
   // ==================== MOVIE METHODS ====================
 
   /**
@@ -256,6 +281,7 @@ class MovieApiService {
    * @param page - Page number for pagination (default: 1)
    * @returns Promise<MovieResponse> - Response containing popular movies
    */
+
   async getPopularMovies(page: number = 1): Promise<MovieResponse> {
     return this.makeRequest<MovieResponse>(`/movie/popular?page=${page}`);
   }

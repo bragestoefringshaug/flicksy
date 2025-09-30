@@ -15,11 +15,11 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Dimensions,
-  StyleSheet,
-  View
+    ActivityIndicator,
+    Alert,
+    Dimensions,
+    StyleSheet,
+    View
 } from 'react-native';
 import MovieCard from '../components/MovieCard';
 import { ThemedText } from '../components/ThemedText';
@@ -169,10 +169,14 @@ export default function SwipeScreen() {
       setIsLoading(true);
       let initialCards: (Movie | TVShow)[] = [];
       
+
+      if (user && (user.preferences.likedMovies.length > 0 || user.preferences.genres.length > 0)) {
+
       if (user && user.preferences.likedMovies.length > 0) {
         // Clean up invalid IDs from user preferences first
         await cleanupInvalidUserPreferences();
         
+
         // Use personalized recommendations if user has preferences
         const swipedIdsArray = Array.from(swipedCardIds);
         initialCards = await recommendationService.getPersonalizedRecommendations(
@@ -215,12 +219,17 @@ export default function SwipeScreen() {
       setIsLoadingMore(true);
       let newCards: (Movie | TVShow)[] = [];
       
+
+      if (user && (user.preferences.likedMovies.length > 0 || user.preferences.genres.length > 0)) {
+        // Use personalized recommendations
+
       if (user && user.preferences.likedMovies.length > 0) {
         // Clean up invalid IDs before getting recommendations
         await cleanupInvalidUserPreferences();
         
         // Use personalized recommendations with more diversity
         const swipedIdsArray = Array.from(swipedCardIds);
+
         newCards = await recommendationService.getPersonalizedRecommendations(
           user.preferences,
           30, // Load more cards for better variety

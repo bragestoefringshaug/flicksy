@@ -1,6 +1,7 @@
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import React from 'react';
 import { router, type Href } from 'expo-router';
 import {
@@ -14,6 +15,7 @@ import { useAuth } from '../../contexts/AuthContext';
 
 export default function ProfileScreen() {
   const { user, logout } = useAuth();
+  const router = useRouter();
 
   const handleLogout = () => {
     Alert.alert(
@@ -71,8 +73,18 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.menuContainer}>
+
+          <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/(tabs)/preferences')}>
+            <Ionicons name="list-outline" size={24} color="#666" />
+            <ThemedText style={styles.menuText}>Preferences</ThemedText>
+            <Ionicons name="chevron-forward" size={20} color="#ccc" />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.menuItem}>
+
           {/* Settings -> open the Streaming Services screen so users can update preferences later */}
           <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/streaming-services' as Href)}>
+
             <Ionicons name="settings-outline" size={24} color="#666" />
             <ThemedText style={styles.menuText}>Settings</ThemedText>
             <Ionicons name="chevron-forward" size={20} color="#ccc" />

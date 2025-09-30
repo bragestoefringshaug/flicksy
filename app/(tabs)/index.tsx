@@ -6,6 +6,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import LoginScreen from '../../screens/LoginScreen';
 import RegisterScreen from '../../screens/RegisterScreen';
 import SwipeScreen from '../../screens/SwipeScreen';
+import PreferencesScreen from './preferences';
 
 export default function HomeScreen() {
   const { user, isLoading } = useAuth();
@@ -26,6 +27,12 @@ export default function HomeScreen() {
     ) : (
       <LoginScreen onSwitchToRegister={() => setShowRegister(true)} />
     );
+  }
+
+  const needsPreferences = !user.preferences?.genres || user.preferences.genres.length === 0;
+
+  if (needsPreferences) {
+    return <PreferencesScreen />;
   }
 
   return <SwipeScreen />;
