@@ -124,38 +124,56 @@ export default function SwipeScreen() {
    * It refills the stack with available cards when cards are swiped away.
    */
   useEffect(() => {
+    // Only refill if we have less than 5 cards and more cards available
     if (cardStack.length < 5 && allCards.length > 0) {
       console.log(`Card stack has ${cardStack.length} cards, refilling to 5...`);
-      const availableCards = allCards.filter(card => 
-        !swipedCardIds.has(card.id) && !recentlyShownIds.has(card.id)
-      );
-      const cardsNotInStack = availableCards.filter(card => 
-        !cardStack.some(stackCard => stackCard.id === card.id)
-      );
       
-      if (cardsNotInStack.length > 0) {
-        // Shuffle available cards to add randomness
-        const shuffledCards = shuffleArray(cardsNotInStack);
-        const cardsToAdd = shuffledCards.slice(0, 5 - cardStack.length);
-        setCardStack(prevStack => [...prevStack, ...cardsToAdd]);
-        
-        // Add new cards to recently shown tracking
-        setRecentlyShownIds(prev => {
-          const newSet = new Set(prev);
-          cardsToAdd.forEach(card => newSet.add(card.id));
-          return newSet;
+      // Use a timeout to avoid race conditions with moveToNextCard
+      const timeoutId = setTimeout(() => {
+        setCardStack(prevStack => {
+          // Double-check the length inside the setter to avoid race conditions
+          if (prevStack.length >= 5) {
+            console.log('Card stack already has 5+ cards, skipping refill');
+            return prevStack;
+          }
+          
+          const availableCards = allCards.filter(card => 
+            !swipedCardIds.has(card.id) && !recentlyShownIds.has(card.id)
+          );
+          const cardsNotInStack = availableCards.filter(card => 
+            !prevStack.some(stackCard => stackCard.id === card.id)
+          );
+          
+          if (cardsNotInStack.length > 0) {
+            // Shuffle available cards to add randomness
+            const shuffledCards = shuffleArray(cardsNotInStack);
+            const cardsToAdd = shuffledCards.slice(0, 5 - prevStack.length);
+            console.log(`Adding ${cardsToAdd.length} cards to stack`);
+            
+            // Add new cards to recently shown tracking
+            setRecentlyShownIds(prev => {
+              const newSet = new Set(prev);
+              cardsToAdd.forEach(card => newSet.add(card.id));
+              return newSet;
+            });
+            
+            return [...prevStack, ...cardsToAdd];
+          } else {
+            // No more available cards, trigger loading more
+            console.log('No more available cards, loading more...');
+            loadMoreCards();
+            return prevStack;
+          }
         });
-      } else {
-        // No more available cards, trigger loading more
-        console.log('No more available cards, loading more...');
-        loadMoreCards();
-      }
+      }, 100); // Small delay to avoid race conditions
+      
+      return () => clearTimeout(timeoutId);
     } else if (cardStack.length < 5 && allCards.length === 0) {
       // No cards at all, reload everything
       console.log('No cards available, reloading...');
       loadInitialCards();
     }
-  }, [cardStack.length, allCards, swipedCardIds, cardStack, recentlyShownIds]);
+  }, [cardStack.length, allCards.length, swipedCardIds.size, recentlyShownIds.size]);
 
   /**
    * Load initial cards for the swipe interface
@@ -267,8 +285,11 @@ export default function SwipeScreen() {
   };
 
   const moveToNextCard = useCallback(() => {
+    console.log('moveToNextCard called, current stack length:', cardStack.length);
     setCardStack(prevStack => {
+      console.log('Previous stack:', prevStack.map(card => 'title' in card ? card.title : card.name));
       const newStack = prevStack.slice(1); // Remove the top card
+      console.log('New stack after slice:', newStack.map(card => 'title' in card ? card.title : card.name));
       
       // Add the next recommended card to maintain 5 cards
       const availableCards = allCards.filter(card => 
@@ -294,10 +315,10 @@ export default function SwipeScreen() {
       
       return newStack;
     });
-  }, [allCards, swipedCardIds, recentlyShownIds]);
+  }, [allCards, swipedCardIds, recentlyShownIds, loadMoreCards]);
 
   const handleSwipeLeft = useCallback(async (item: Movie | TVShow) => {
-    console.log('handleSwipeLeft called with:', item);
+    console.log('handleSwipeLeft called with:', 'title' in item ? item.title : item.name);
     
     // Mark this card as swiped
     setSwipedCardIds(prev => new Set([...prev, item.id]));
@@ -320,7 +341,7 @@ export default function SwipeScreen() {
   }, [user, updatePreferences, moveToNextCard, allCards.length, swipedCardIds.size]);
 
   const handleSwipeRight = useCallback(async (item: Movie | TVShow) => {
-    console.log('handleSwipeRight called with:', item);
+    console.log('handleSwipeRight called with:', 'title' in item ? item.title : item.name);
     
     // Mark this card as swiped
     setSwipedCardIds(prev => new Set([...prev, item.id]));
@@ -411,6 +432,9 @@ export default function SwipeScreen() {
           const isThirdCard = index === 2;
           const isFourthCard = index === 3;
           const isFifthCard = index === 4;
+          
+          // Debug logging
+          console.log(`Card ${index}: ${'title' in card ? card.title : card.name}, isTopCard: ${isTopCard}`);
           
           return (
             <MovieCard
