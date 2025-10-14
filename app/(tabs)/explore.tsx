@@ -15,15 +15,9 @@ export default function ProfileScreen() {
   const { user, logout } = useAuth();
   const router = useRouter();
 
-  const handleLogout = () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Logout', style: 'destructive', onPress: logout },
-      ]
-    );
+  const handleLogout = async () => {
+    await logout();
+    router.replace('/(tabs)' as Href);
   };
 
   const handleClearData = () => {
@@ -72,14 +66,17 @@ export default function ProfileScreen() {
 
         <View style={styles.menuContainer}>
 
-          <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/preferences')}>
+          <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/(tabs)/preferences')}>
             <Ionicons name="list-outline" size={24} color="#666" />
             <ThemedText style={styles.menuText}>Preferences</ThemedText>
             <Ionicons name="chevron-forward" size={20} color="#ccc" />
           </TouchableOpacity>
 
+          <TouchableOpacity style={styles.menuItem}> </TouchableOpacity>
+
           {/* Settings -> open the Streaming Services screen so users can update preferences later */}
           <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/streaming-services' as Href)}>
+
             <Ionicons name="settings-outline" size={24} color="#666" />
             <ThemedText style={styles.menuText}>Settings</ThemedText>
             <Ionicons name="chevron-forward" size={20} color="#ccc" />

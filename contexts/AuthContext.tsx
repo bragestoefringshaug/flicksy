@@ -24,6 +24,7 @@ interface User {
     likedMovies: number[]; // Array of liked movie IDs
     dislikedMovies: number[]; // Array of disliked movie IDs
     watchlist: number[]; // Array of watchlist movie/TV show IDs
+    seen: number[]; // Array of seen movie/TV show IDs
     streamingServices?: string[]; // User's selected streaming services
   };
 }
@@ -92,7 +93,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const userData = await AsyncStorage.getItem('user');
       if (userData) {
-        setUser(JSON.parse(userData));
+        const parsed = JSON.parse(userData);
+        // Normalize missing fields for backward compatibility
+        if (!parsed.preferences) parsed.preferences = {};
+        if (!Array.isArray(parsed.preferences.seen)) parsed.preferences.seen = [];
+        setUser(parsed);
+        // Persist normalization back to storage
+        await AsyncStorage.setItem('user', JSON.stringify(parsed));
       }
     } catch (error) {
       console.error('Error loading user:', error);
@@ -139,6 +146,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           likedMovies: [],
           dislikedMovies: [],
           watchlist: [],
+          seen: [],
           streamingServices: [],
         },
       };

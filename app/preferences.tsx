@@ -1,38 +1,24 @@
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
-import { useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { ALL_GENRES } from '@/constants/Genres';
+import { useNavigation, useRouter } from 'expo-router';
+import { useEffect, useMemo, useState } from 'react';
 import { Alert, FlatList, Pressable, StyleSheet, View } from 'react-native';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../../../contexts/AuthContext';
 
-const ALL_GENRES = [
-  'Action',
-  'Adventure',
-  'Animation',
-  'Comedy',
-  'Crime',
-  'Documentary',
-  'Drama',
-  'Family',
-  'Fantasy',
-  'History',
-  'Horror',
-  'Music',
-  'Mystery',
-  'Romance',
-  'Science Fiction',
-  'TV Movie',
-  'Thriller',
-  'War',
-  'Western',
-];
+// Use shared genre list
 
 export default function PreferencesScreen() {
   const { user, updatePreferences } = useAuth();
   const router = useRouter();
+  const navigation = useNavigation();
   const initial = useMemo(() => new Set(user?.preferences.genres ?? []), [user?.preferences.genres]);
   const [selected, setSelected] = useState<Set<string>>(initial);
   const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    navigation.setOptions({ title: 'Preferences' });
+  }, [navigation]);
 
   const toggleGenre = (genre: string) => {
     setSelected(prev => {
@@ -47,8 +33,8 @@ export default function PreferencesScreen() {
       setIsSaving(true);
       await updatePreferences({ genres: Array.from(selected) });
       Alert.alert('Saved', 'Your preferences have been updated.');
-      // Navigate back to profile screen after saving
-      router.back();
+      // Navigate to Discover tab after saving
+      router.replace('/(tabs)');
     } catch (e: any) {
       Alert.alert('Error', e?.message ?? 'Failed to save preferences');
     } finally {
@@ -142,3 +128,5 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
+
+
