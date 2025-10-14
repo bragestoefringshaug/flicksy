@@ -6,7 +6,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import LoginScreen from '../../screens/LoginScreen';
 import RegisterScreen from '../../screens/RegisterScreen';
 import SwipeScreen from '../../screens/SwipeScreen';
-import PreferencesScreen from '../preferences';
+import StreamingServicesScreen from '../../screens/StreamingServices';
+import GenreSelection from '../../screens/GenreSelection';
 
 export default function HomeScreen() {
   const { user, isLoading } = useAuth();
@@ -29,10 +30,15 @@ export default function HomeScreen() {
     );
   }
 
-  const needsPreferences = !user.preferences?.genres || user.preferences.genres.length === 0;
+  const needsGenres = !user.preferences?.genres || user.preferences.genres.length === 0;
+  const needsStreamingServices = !user.preferences?.streamingServices || user.preferences.streamingServices.length === 0;
 
-  if (needsPreferences) {
-    return <PreferencesScreen />;
+  if (needsStreamingServices) {
+    return <StreamingServicesScreen />;
+  }
+
+  if (needsGenres) {
+    return <GenreSelection />;
   }
 
   return <SwipeScreen />;
