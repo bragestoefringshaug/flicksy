@@ -13,7 +13,7 @@
  * @version 1.0.0
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -37,7 +37,7 @@ const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
  * Manages the card stack, handles user interactions, and integrates with
  * the recommendation system to provide personalized content discovery.
  */
-export default function SwipeScreen() {
+export default function SwipeScreen(): React.ReactElement {
   // ==================== HOOKS AND STATE ====================
   
   const { user, updatePreferences } = useAuth(); // Authentication context
@@ -169,31 +169,24 @@ export default function SwipeScreen() {
       setIsLoading(true);
       let initialCards: (Movie | TVShow)[] = [];
       
-
+      // Decide between personalized vs general content
       if (user && (user.preferences.likedMovies.length > 0 || user.preferences.genres.length > 0)) {
-
-      if (user && user.preferences.likedMovies.length > 0) {
-        // Clean up invalid IDs from user preferences first
+        // Personalized recommendations
         await cleanupInvalidUserPreferences();
-        
-
-        // Use personalized recommendations if user has preferences
         const swipedIdsArray = Array.from(swipedCardIds);
         initialCards = await recommendationService.getPersonalizedRecommendations(
           user.preferences,
-          50, // Load more cards initially for better diversity
+          50,
           swipedIdsArray
         );
       } else {
-        // Use general popular content for new users - load from multiple pages
+        // General popular content for new users - load from multiple pages
         const [page1, page2, page3] = await Promise.all([
           movieApi.getMixedContent(1),
           movieApi.getMixedContent(2),
           movieApi.getMixedContent(3)
         ]);
         const allContent = [...page1, ...page2, ...page3];
-        
-        // Filter out swiped cards for new users too
         const swipedIdsArray = Array.from(swipedCardIds);
         initialCards = allContent.filter(card => !swipedIdsArray.includes(card.id));
       }
@@ -219,32 +212,24 @@ export default function SwipeScreen() {
       setIsLoadingMore(true);
       let newCards: (Movie | TVShow)[] = [];
       
-
+      // Decide between personalized vs general content
       if (user && (user.preferences.likedMovies.length > 0 || user.preferences.genres.length > 0)) {
-        // Use personalized recommendations
-
-      if (user && user.preferences.likedMovies.length > 0) {
-        // Clean up invalid IDs before getting recommendations
+        // Personalized recommendations
         await cleanupInvalidUserPreferences();
-        
-        // Use personalized recommendations with more diversity
         const swipedIdsArray = Array.from(swipedCardIds);
-
         newCards = await recommendationService.getPersonalizedRecommendations(
           user.preferences,
-          30, // Load more cards for better variety
+          30,
           swipedIdsArray
         );
       } else {
-        // Use general content from multiple pages for better diversity
+        // General content from multiple pages for better diversity
         const currentPage = Math.floor(allCards.length / 20) + 1;
         const [page1, page2] = await Promise.all([
           movieApi.getMixedContent(currentPage),
           movieApi.getMixedContent(currentPage + 1)
         ]);
         const allNewContent = [...page1, ...page2];
-        
-        // Filter out swiped cards
         const swipedIdsArray = Array.from(swipedCardIds);
         newCards = allNewContent.filter(card => !swipedIdsArray.includes(card.id));
       }

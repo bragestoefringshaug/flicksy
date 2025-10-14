@@ -1,15 +1,13 @@
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import React from 'react';
-import { router, type Href } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import {
-    Alert,
-    ScrollView,
-    StyleSheet,
-    TouchableOpacity,
-    View
+  Alert,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -17,15 +15,9 @@ export default function ProfileScreen() {
   const { user, logout } = useAuth();
   const router = useRouter();
 
-  const handleLogout = () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Logout', style: 'destructive', onPress: logout },
-      ]
-    );
+  const handleLogout = async () => {
+    await logout();
+    router.replace('/(tabs)' as Href);
   };
 
   const handleClearData = () => {
@@ -80,7 +72,7 @@ export default function ProfileScreen() {
             <Ionicons name="chevron-forward" size={20} color="#ccc" />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity style={styles.menuItem}> </TouchableOpacity>
 
           {/* Settings -> open the Streaming Services screen so users can update preferences later */}
           <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/streaming-services' as Href)}>

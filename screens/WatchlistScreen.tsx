@@ -1,18 +1,22 @@
 import { Ionicons } from '@expo/vector-icons';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Image,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    Animated,
+    FlatList,
+    Image,
+    Modal,
+    PanResponder,
+    RefreshControl,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { ThemedText } from '../components/ThemedText';
 import { ThemedView } from '../components/ThemedView';
+import { ALL_GENRES } from '../constants/Genres';
 import { useAuth } from '../contexts/AuthContext';
 import { Movie, movieApi } from '../services/movieApi';
 
@@ -20,13 +24,126 @@ interface WatchlistItem extends Movie {
   isMovie: boolean;
   name?: string;
   first_air_date?: string;
+  genreNames: string[];
 }
+
+interface WatchlistRowProps {
+  item: WatchlistItem;
+  onMarkSeen: (id: number) => void;
+  onDelete: (id: number) => void;
+}
+
+const WatchlistRow: React.FC<WatchlistRowProps> = ({ item, onMarkSeen, onDelete }) => {
+  const title = item.isMovie ? item.title : (item.name || 'Unknown');
+  const releaseDate = item.isMovie ? item.release_date : (item.first_air_date || '');
+  const year = releaseDate ? new Date(releaseDate).getFullYear() : 'N/A';
+  const posterUrl = movieApi.getImageUrl(item.poster_path, 'w185');
+
+  const translateX = React.useRef(new Animated.Value(0)).current;
+  const seenTextOpacity = translateX.interpolate({
+    inputRange: [-120, -40, 0],
+    outputRange: [1, 0.4, 0],
+    extrapolate: 'clamp',
+  });
+
+  const panResponder = React.useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderMove: (_, gesture) => {
+        if (gesture.dx < 0) {
+          translateX.setValue(gesture.dx);
+        }
+      },
+      onPanResponderRelease: async (_, gesture) => {
+        const threshold = -120;
+        if (gesture.dx < threshold) {
+          onMarkSeen(item.id);
+        } else {
+          Animated.spring(translateX, { toValue: 0, useNativeDriver: false }).start();
+        }
+      },
+    })
+  ).current;
+
+  const handleNudgeSeen = () => {
+    Animated.spring(translateX, { toValue: -80, useNativeDriver: false }).start(() => {
+      Animated.spring(translateX, { toValue: 0, useNativeDriver: false }).start();
+    });
+  };
+
+  return (
+    <View style={styles.swipeContainer}>
+      <View style={styles.revealRight}>
+        <Animated.Text style={[styles.revealText, { opacity: seenTextOpacity }]}>Seen</Animated.Text>
+      </View>
+      <Animated.View style={[styles.itemContainer, { transform: [{ translateX }] }]} {...panResponder.panHandlers}>
+      <Image
+        source={{ uri: posterUrl }}
+        style={styles.poster}
+        resizeMode="cover"
+      />
+      
+      <View style={styles.itemContent}>
+        <View style={styles.itemHeader}>
+          <ThemedText
+            style={[styles.itemTitle, item.isMovie ? styles.movieTitle : styles.tvTitle]}
+            numberOfLines={2}
+          >
+            {title}
+          </ThemedText>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <TouchableOpacity
+              style={styles.removeButton}
+              onPress={handleNudgeSeen}
+            >
+              <Ionicons name="checkmark-circle" size={24} color="#34C759" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.removeButton}
+              onPress={() => onDelete(item.id)}
+            >
+              <Ionicons name="close-circle" size={24} color="#F44336" />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.itemDetails}>
+          <View style={styles.ratingContainer}>
+            <Ionicons name="star" size={14} color="#FFD700" />
+            <Text style={styles.rating}>{item.vote_average.toFixed(1)}</Text>
+            <Text style={styles.year}>({year})</Text>
+          </View>
+
+          <View style={styles.typeContainer}>
+            <View style={[styles.typeBadge, { backgroundColor: item.isMovie ? '#007AFF' : '#34C759' }]}>
+              <Text style={styles.typeText}>
+                {item.isMovie ? 'Movie' : 'TV Show'}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Removed in-card Seen badge; only reveal text behind card remains */}
+
+        <Text style={styles.overview} numberOfLines={3}>
+          {item.overview}
+        </Text>
+      </View>
+      </Animated.View>
+    </View>
+  );
+};
 
 export default function WatchlistScreen() {
   const { user, updatePreferences } = useAuth();
   const [watchlistItems, setWatchlistItems] = useState<WatchlistItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
+  const [seenFilter, setSeenFilter] = useState<'all' | 'seen' | 'unseen'>('all');
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [activeFilterTab, setActiveFilterTab] = useState<'Genres' | 'Seen'>('Genres');
 
   useEffect(() => {
     loadWatchlist();
@@ -48,12 +165,14 @@ export default function WatchlistScreen() {
         try {
           // Try to get as movie first
           const movie = await movieApi.getMovieDetails(itemId);
-          items.push({ ...movie, isMovie: true });
+          const genreNames = await movieApi.mapGenreIdsToNames(movie.genre_ids ?? []);
+          items.push({ ...movie, isMovie: true, genreNames });
         } catch {
           try {
             // If not a movie, try as TV show
             const tvShow = await movieApi.getTVShowDetails(itemId);
-            items.push({ ...tvShow, isMovie: false });
+            const genreNames = await movieApi.mapGenreIdsToNames(tvShow.genre_ids ?? []);
+            items.push({ ...tvShow, isMovie: false, genreNames });
           } catch (error) {
             console.warn(`Could not load details for item ${itemId}:`, error);
           }
@@ -96,59 +215,64 @@ export default function WatchlistScreen() {
     );
   };
 
-  const renderWatchlistItem = ({ item }: { item: WatchlistItem }) => {
-    const title = item.isMovie ? item.title : (item.name || 'Unknown');
-    const releaseDate = item.isMovie ? item.release_date : (item.first_air_date || '');
-    const year = releaseDate ? new Date(releaseDate).getFullYear() : 'N/A';
-    const posterUrl = movieApi.getImageUrl(item.poster_path, 'w185');
-
-    return (
-      <View style={styles.itemContainer}>
-        <Image
-          source={{ uri: posterUrl }}
-          style={styles.poster}
-          resizeMode="cover"
-        />
-        
-        <View style={styles.itemContent}>
-          <View style={styles.itemHeader}>
-            <ThemedText
-              style={[styles.itemTitle, item.isMovie ? styles.movieTitle : styles.tvTitle]}
-              numberOfLines={2}
-            >
-              {title}
-            </ThemedText>
-            <TouchableOpacity
-              style={styles.removeButton}
-              onPress={() => removeFromWatchlist(item.id)}
-            >
-              <Ionicons name="close-circle" size={24} color="#F44336" />
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.itemDetails}>
-            <View style={styles.ratingContainer}>
-              <Ionicons name="star" size={14} color="#FFD700" />
-              <Text style={styles.rating}>{item.vote_average.toFixed(1)}</Text>
-              <Text style={styles.year}>({year})</Text>
-            </View>
-
-            <View style={styles.typeContainer}>
-              <View style={[styles.typeBadge, { backgroundColor: item.isMovie ? '#007AFF' : '#34C759' }]}>
-                <Text style={styles.typeText}>
-                  {item.isMovie ? 'Movie' : 'TV Show'}
-                </Text>
-              </View>
-            </View>
-          </View>
-
-          <Text style={styles.overview} numberOfLines={3}>
-            {item.overview}
-          </Text>
-        </View>
-      </View>
-    );
+  const removeFromWatchlistImmediate = async (itemId: number) => {
+    if (!user) return;
+    try {
+      const updatedWatchlist = user.preferences.watchlist.filter(id => id !== itemId);
+      await updatePreferences({ watchlist: updatedWatchlist });
+      setWatchlistItems(prev => prev.filter(item => item.id !== itemId));
+    } catch (e) {
+      console.error('Failed to remove from watchlist', e);
+    }
   };
+
+  const markItemAsSeen = async (itemId: number) => {
+    if (!user) return;
+    try {
+      const seen = new Set(user.preferences.seen ?? []);
+      seen.add(itemId);
+      await updatePreferences({ seen: Array.from(seen) });
+      // Keep the item in the list; UI will now show Seen badge
+      setWatchlistItems(prev => prev);
+    } catch (e) {
+      console.error('Failed to mark item as seen', e);
+    }
+  };
+
+  const renderWatchlistItem = ({ item }: { item: WatchlistItem }) => (
+    <WatchlistRow
+      item={item}
+      onMarkSeen={markItemAsSeen}
+      onDelete={removeFromWatchlistImmediate}
+    />
+  );
+
+  const availableGenres = useMemo(() => {
+    // Show all known genres so users can pre-filter even if not present
+    return ALL_GENRES;
+  }, []);
+
+  const userSeenIds = useMemo(() => {
+    const set = new Set<number>();
+    if (user) {
+      for (const id of user.preferences.seen ?? []) set.add(id);
+    }
+    return set;
+  }, [user?.preferences.seen]);
+
+  const displayedItems = useMemo(() => {
+    let items = watchlistItems;
+    // Seen filter first
+    if (seenFilter !== 'all') {
+      const mustBeSeen = seenFilter === 'seen';
+      items = items.filter(i => mustBeSeen ? userSeenIds.has(i.id) : !userSeenIds.has(i.id));
+    }
+    // Genre filter
+    if (selectedGenre) {
+      items = items.filter(i => i.genreNames.includes(selectedGenre));
+    }
+    return items;
+  }, [watchlistItems, selectedGenre, seenFilter, userSeenIds]);
 
   const renderEmptyState = () => (
     <View style={styles.emptyContainer}>
@@ -173,13 +297,16 @@ export default function WatchlistScreen() {
     <ThemedView style={styles.container}>
       <View style={styles.header}>
         <ThemedText style={styles.headerTitle}>My Watchlist</ThemedText>
-        <ThemedText style={styles.headerSubtitle}>
-          {watchlistItems.length} {watchlistItems.length === 1 ? 'item' : 'items'}
-        </ThemedText>
+        <View style={styles.headerRight}>
+          <TouchableOpacity style={styles.filterButton} onPress={() => setIsFilterOpen(true)}>
+            <Ionicons name="filter" size={18} color="#007AFF" />
+            <Text style={styles.filterButtonText}>Filter</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <FlatList
-        data={watchlistItems}
+        data={displayedItems}
         renderItem={renderWatchlistItem}
         keyExtractor={(item) => item.id.toString()}
         contentContainerStyle={styles.listContainer}
@@ -193,6 +320,73 @@ export default function WatchlistScreen() {
         ListEmptyComponent={renderEmptyState}
         showsVerticalScrollIndicator={false}
       />
+
+      <Modal visible={isFilterOpen} transparent animationType="fade" onRequestClose={() => setIsFilterOpen(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <View style={styles.tabsRow}>
+              <TouchableOpacity
+                style={[styles.tabButton, activeFilterTab === 'Genres' && styles.tabButtonActive]}
+                onPress={() => setActiveFilterTab('Genres')}
+              >
+                <Text style={[styles.tabButtonText, activeFilterTab === 'Genres' && styles.tabButtonTextActive]}>Genres</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.tabButton, activeFilterTab === 'Seen' && styles.tabButtonActive]}
+                onPress={() => setActiveFilterTab('Seen')}
+              >
+                <Text style={[styles.tabButtonText, activeFilterTab === 'Seen' && styles.tabButtonTextActive]}>Seen</Text>
+              </TouchableOpacity>
+            </View>
+
+            {activeFilterTab === 'Genres' ? (
+              <View style={styles.genreChipsContainer}>
+                <TouchableOpacity
+                  style={[styles.chip, !selectedGenre && styles.chipSelected]}
+                  onPress={() => setSelectedGenre(null)}
+                >
+                  <Text style={[styles.chipText, !selectedGenre && styles.chipTextSelected]}>All</Text>
+                </TouchableOpacity>
+                {availableGenres.map(g => (
+                  <TouchableOpacity
+                    key={g}
+                    style={[styles.chip, selectedGenre === g && styles.chipSelected]}
+                    onPress={() => setSelectedGenre(g)}
+                  >
+                    <Text style={[styles.chipText, selectedGenre === g && styles.chipTextSelected]}>{g}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ) : (
+              <View style={styles.genreChipsContainer}>
+                <TouchableOpacity
+                  style={[styles.chip, seenFilter === 'all' && styles.chipSelected]}
+                  onPress={() => setSeenFilter('all')}
+                >
+                  <Text style={[styles.chipText, seenFilter === 'all' && styles.chipTextSelected]}>All</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.chip, seenFilter === 'seen' && styles.chipSelected]}
+                  onPress={() => setSeenFilter('seen')}
+                >
+                  <Text style={[styles.chipText, seenFilter === 'seen' && styles.chipTextSelected]}>Seen</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.chip, seenFilter === 'unseen' && styles.chipSelected]}
+                  onPress={() => setSeenFilter('unseen')}
+                >
+                  <Text style={[styles.chipText, seenFilter === 'unseen' && styles.chipTextSelected]}>Unseen</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.modalButton} onPress={() => setIsFilterOpen(false)}>
+                <Text style={styles.modalButtonText}>Done</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ThemedView>
   );
 }
@@ -226,6 +420,51 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
   },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  tabsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  tabButton: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 999,
+    backgroundColor: '#f7f7f7',
+  },
+  tabButtonActive: {
+    backgroundColor: '#007AFF22',
+    borderColor: '#007AFF',
+  },
+  tabButtonText: {
+    color: '#555',
+    fontWeight: '600',
+  },
+  tabButtonTextActive: {
+    color: '#007AFF',
+  },
+  filterButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1,
+    borderColor: '#007AFF',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: '#007AFF11',
+  },
+  filterButtonText: {
+    color: '#007AFF',
+    fontWeight: '600',
+  },
   listContainer: {
     paddingHorizontal: 20,
     paddingBottom: 20,
@@ -244,6 +483,23 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
     overflow: 'hidden',
+  },
+  swipeContainer: {
+    position: 'relative',
+  },
+  revealRight: {
+    position: 'absolute',
+    right: 20,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+    zIndex: 0,
+  },
+  revealText: {
+    color: '#34C759',
+    fontWeight: '800',
+    fontSize: 18,
   },
   poster: {
     width: 80,
@@ -305,6 +561,30 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#fff',
   },
+  seenBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#34C759',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    marginBottom: 8,
+  },
+  seenBadgeText: {
+    color: 'white',
+    fontWeight: '700',
+  },
+  seenBadgeSmall: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    marginBottom: 0,
+    position: 'absolute',
+    top: 8,
+    right: 8,
+  },
+  seenBadgeTextSmall: {
+    fontSize: 10,
+    fontWeight: '800',
+  },
   overview: {
     fontSize: 14,
     color: '#666',
@@ -328,5 +608,62 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
     lineHeight: 22,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 500,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 12,
+  },
+  genreChipsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  chip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    backgroundColor: '#fff',
+  },
+  chipSelected: {
+    backgroundColor: '#007AFF22',
+    borderColor: '#007AFF',
+  },
+  chipText: {
+    fontSize: 14,
+  },
+  chipTextSelected: {
+    color: '#007AFF',
+    fontWeight: '600',
+  },
+  modalActions: {
+    marginTop: 16,
+    alignItems: 'flex-end',
+  },
+  modalButton: {
+    backgroundColor: '#007AFF',
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  modalButtonText: {
+    color: 'white',
+    fontWeight: '600',
   },
 });

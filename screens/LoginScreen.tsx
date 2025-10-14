@@ -1,14 +1,14 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    Alert,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { ThemedText } from '../components/ThemedText';
 import { ThemedView } from '../components/ThemedView';
@@ -47,7 +47,7 @@ export default function LoginScreen({ onSwitchToRegister }: LoginScreenProps) {
       >
         <ScrollView contentContainerStyle={styles.scrollContainer}>
           <View style={styles.header}>
-            <ThemedText style={styles.title}>Welcome to Flicksy</ThemedText>
+            <ThemedText style={styles.logo}>Flicksy</ThemedText>
             <ThemedText style={styles.subtitle}>Discover your next favorite movie or TV show</ThemedText>
           </View>
 
@@ -126,6 +126,14 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 10,
     textAlign: 'center',
+  },
+  logo: {
+    fontSize: 40,
+    fontWeight: '900',
+    marginBottom: 10,
+    textAlign: 'center',
+    letterSpacing: 1,
+    color: '#007AFF',
   },
   subtitle: {
     fontSize: 16,
