@@ -18,7 +18,8 @@ import { ThemedText } from '../components/ThemedText';
 import { ThemedView } from '../components/ThemedView';
 import { ALL_GENRES } from '../constants/Genres';
 import { useAuth } from '../contexts/AuthContext';
-import { movieApi } from '../services/movieApi';
+import { MovieMetadata } from '../services/firebaseDb';
+import { Movie, movieApi } from '../services/movieApi';
 
 interface WatchlistItem {
   id: number;
@@ -155,7 +156,7 @@ const WatchlistRow: React.FC<WatchlistRowProps> = ({ item, onMarkSeen, onDelete 
 };
 
 export default function WatchlistScreen() {
-  const { user, updatePreferences } = useAuth();
+  const { user, updatePreferences, recordMovieInteraction } = useAuth();
   const [watchlistItems, setWatchlistItems] = useState<WatchlistItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -164,12 +165,28 @@ export default function WatchlistScreen() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [activeFilterTab, setActiveFilterTab] = useState<'Genres' | 'Seen'>('Genres');
 
+  /**
+   * Extract movie metadata for ML purposes
+   */
+  const extractMovieMetadata = (item: WatchlistItem): MovieMetadata => {
+    const releaseDate = item.isMovie ? item.release_date : item.first_air_date;
+    const releaseYear = releaseDate ? new Date(releaseDate).getFullYear() : 0;
+    
+    return {
+      title: item.isMovie ? item.title : (item.name || 'Unknown'),
+      genres: item.genre_ids || [],
+      releaseYear,
+      popularity: item.popularity || 0,
+      isMovie: item.isMovie
+    };
+  };
+
   useEffect(() => {
     loadWatchlist();
   }, [user]);
 
   const loadWatchlist = async () => {
-    if (!user || user.preferences.watchlist.length === 0) {
+    if (!user || !user.preferences || user.preferences.watchlist?.length === 0) {
       setWatchlistItems([]);
       setIsLoading(false);
       return;
@@ -225,7 +242,7 @@ export default function WatchlistScreen() {
           text: 'Remove',
           style: 'destructive',
           onPress: async () => {
-            const updatedWatchlist = user.preferences.watchlist.filter(id => id !== itemId);
+            const updatedWatchlist = (user.preferences?.watchlist || []).filter(id => id !== itemId);
             await updatePreferences({ watchlist: updatedWatchlist });
             setWatchlistItems(prev => prev.filter(item => item.id !== itemId));
           },
@@ -237,7 +254,7 @@ export default function WatchlistScreen() {
   const removeFromWatchlistImmediate = async (itemId: number) => {
     if (!user) return;
     try {
-      const updatedWatchlist = user.preferences.watchlist.filter(id => id !== itemId);
+      const updatedWatchlist = (user.preferences?.watchlist || []).filter(id => id !== itemId);
       await updatePreferences({ watchlist: updatedWatchlist });
       setWatchlistItems(prev => prev.filter(item => item.id !== itemId));
     } catch (e) {
@@ -248,9 +265,21 @@ export default function WatchlistScreen() {
   const markItemAsSeen = async (itemId: number) => {
     if (!user) return;
     try {
-      const seen = new Set(user.preferences.seen ?? []);
+      const seen = new Set(user.preferences?.seen ?? []);
       seen.add(itemId);
       await updatePreferences({ seen: Array.from(seen) });
+      
+      // Record interaction for ML
+      const item = watchlistItems.find(i => i.id === itemId);
+      if (item) {
+        try {
+          const movieMetadata = extractMovieMetadata(item);
+          await recordMovieInteraction(itemId, 'seen', movieMetadata);
+        } catch (error) {
+          console.error('Error recording seen interaction:', error);
+        }
+      }
+      
       // Keep the item in the list; UI will now show Seen badge
       setWatchlistItems(prev => prev);
     } catch (e) {

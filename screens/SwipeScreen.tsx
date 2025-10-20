@@ -10,10 +10,10 @@
  * - User preference tracking
  * 
  * @author Flicksy Team
- * @version 1.0.0
+ * @version 2.0.0 - Simplified and stable version
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -25,6 +25,7 @@ import MovieCard from '../components/MovieCard';
 import { ThemedText } from '../components/ThemedText';
 import { ThemedView } from '../components/ThemedView';
 import { useAuth } from '../contexts/AuthContext';
+import { MovieMetadata } from '../services/firebaseDb';
 import { Movie, movieApi, TVShow } from '../services/movieApi';
 import { recommendationService } from '../services/recommendationService';
 
@@ -32,32 +33,26 @@ import { recommendationService } from '../services/recommendationService';
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 /**
- * Main SwipeScreen component
- * 
- * Manages the card stack, handles user interactions, and integrates with
- * the recommendation system to provide personalized content discovery.
+ * Main SwipeScreen component - Simplified and stable version
  */
 export default function SwipeScreen(): React.ReactElement {
   // ==================== HOOKS AND STATE ====================
   
-  const { user, updatePreferences } = useAuth(); // Authentication context
+  const { user, updatePreferences, recordMovieInteraction } = useAuth();
   
-  // State management for card data and UI
-  const [allCards, setAllCards] = useState<(Movie | TVShow)[]>([]); // All loaded cards
-  const [cardStack, setCardStack] = useState<(Movie | TVShow)[]>([]); // Current 5-card stack
-  const [isLoading, setIsLoading] = useState(true); // Initial loading state
-  const [isLoadingMore, setIsLoadingMore] = useState(false); // Loading more cards state
-  const [swipedCardIds, setSwipedCardIds] = useState<Set<number>>(new Set()); // Track swiped cards
-  const [recentlyShownIds, setRecentlyShownIds] = useState<Set<number>>(new Set()); // Track recently shown cards to prevent immediate repetition
+  // Core state - simplified
+  const [allCards, setAllCards] = useState<(Movie | TVShow)[]>([]);
+  const [cardStack, setCardStack] = useState<(Movie | TVShow)[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [swipedCardIds, setSwipedCardIds] = useState<Set<number>>(new Set());
+  const [recentlyShownIds, setRecentlyShownIds] = useState<Set<number>>(new Set());
+  
+  // Refs to prevent infinite loops
+  const isLoadingRef = useRef(false);
+  const hasInitializedRef = useRef(false);
 
   // ==================== UTILITY FUNCTIONS ====================
   
-  /**
-   * Shuffle an array using Fisher-Yates algorithm
-   * 
-   * @param array - Array to shuffle
-   * @returns T[] - New shuffled array (original array is not modified)
-   */
   const shuffleArray = (array: any[]): any[] => {
     const shuffled = [...array];
     for (let i = shuffled.length - 1; i > 0; i--) {
@@ -66,32 +61,25 @@ export default function SwipeScreen(): React.ReactElement {
     }
     return shuffled;
   };
-  
-  /**
-   * Clean up invalid movie/TV show IDs from user preferences
-   * 
-   * This function validates all IDs in the user's preferences and removes
-   * any that don't exist in the TMDB database to prevent API errors.
-   */
+
   const cleanupInvalidUserPreferences = async () => {
-    if (!user) return;
+    if (!user || !user.preferences) return;
     
     try {
       console.log('Cleaning up invalid user preferences...');
       
-      // Validate liked movies
-      const validLikedMovies = await movieApi.filterValidIds(user.preferences.likedMovies);
-      const invalidLikedMovies = user.preferences.likedMovies.filter(id => !validLikedMovies.includes(id));
+      const likedMovies = user.preferences.likedMovies || [];
+      const dislikedMovies = user.preferences.dislikedMovies || [];
+      const watchlist = user.preferences.watchlist || [];
       
-      // Validate disliked movies
-      const validDislikedMovies = await movieApi.filterValidIds(user.preferences.dislikedMovies);
-      const invalidDislikedMovies = user.preferences.dislikedMovies.filter(id => !validDislikedMovies.includes(id));
+      const validLikedMovies = await movieApi.filterValidIds(likedMovies);
+      const validDislikedMovies = await movieApi.filterValidIds(dislikedMovies);
+      const validWatchlist = await movieApi.filterValidIds(watchlist);
       
-      // Validate watchlist
-      const validWatchlist = await movieApi.filterValidIds(user.preferences.watchlist);
-      const invalidWatchlist = user.preferences.watchlist.filter(id => !validWatchlist.includes(id));
+      const invalidLikedMovies = likedMovies.filter(id => !validLikedMovies.includes(id));
+      const invalidDislikedMovies = dislikedMovies.filter(id => !validDislikedMovies.includes(id));
+      const invalidWatchlist = watchlist.filter(id => !validWatchlist.includes(id));
       
-      // Update preferences if there were invalid IDs
       if (invalidLikedMovies.length > 0 || invalidDislikedMovies.length > 0 || invalidWatchlist.length > 0) {
         console.log(`Removing ${invalidLikedMovies.length} invalid liked movies, ${invalidDislikedMovies.length} invalid disliked movies, ${invalidWatchlist.length} invalid watchlist items`);
         
@@ -108,89 +96,39 @@ export default function SwipeScreen(): React.ReactElement {
     }
   };
 
-  // ==================== EFFECTS ====================
+  // ==================== CORE FUNCTIONS ====================
   
   /**
-   * Load initial cards when component mounts
+   * Extract movie metadata for ML purposes
    */
-  useEffect(() => {
-    loadInitialCards();
-  }, []);
-
-  /**
-   * Maintain exactly 5 cards in the stack at all times
-   * 
-   * This effect ensures the card stack always has 5 cards for smooth swiping.
-   * It refills the stack with available cards when cards are swiped away.
-   */
-  useEffect(() => {
-    // Only refill if we have less than 5 cards and more cards available
-    if (cardStack.length < 5 && allCards.length > 0) {
-      console.log(`Card stack has ${cardStack.length} cards, refilling to 5...`);
-      
-      // Use a timeout to avoid race conditions with moveToNextCard
-      const timeoutId = setTimeout(() => {
-        setCardStack(prevStack => {
-          // Double-check the length inside the setter to avoid race conditions
-          if (prevStack.length >= 5) {
-            console.log('Card stack already has 5+ cards, skipping refill');
-            return prevStack;
-          }
-          
-          const availableCards = allCards.filter(card => 
-            !swipedCardIds.has(card.id) && !recentlyShownIds.has(card.id)
-          );
-          const cardsNotInStack = availableCards.filter(card => 
-            !prevStack.some(stackCard => stackCard.id === card.id)
-          );
-          
-          if (cardsNotInStack.length > 0) {
-            // Shuffle available cards to add randomness
-            const shuffledCards = shuffleArray(cardsNotInStack);
-            const cardsToAdd = shuffledCards.slice(0, 5 - prevStack.length);
-            console.log(`Adding ${cardsToAdd.length} cards to stack`);
-            
-            // Add new cards to recently shown tracking
-            setRecentlyShownIds(prev => {
-              const newSet = new Set(prev);
-              cardsToAdd.forEach(card => newSet.add(card.id));
-              return newSet;
-            });
-            
-            return [...prevStack, ...cardsToAdd];
-          } else {
-            // No more available cards, trigger loading more
-            console.log('No more available cards, loading more...');
-            loadMoreCards();
-            return prevStack;
-          }
-        });
-      }, 100); // Small delay to avoid race conditions
-      
-      return () => clearTimeout(timeoutId);
-    } else if (cardStack.length < 5 && allCards.length === 0) {
-      // No cards at all, reload everything
-      console.log('No cards available, reloading...');
-      loadInitialCards();
-    }
-  }, [cardStack.length, allCards.length, swipedCardIds.size, recentlyShownIds.size]);
-
-  /**
-   * Load initial cards for the swipe interface
-   * 
-   * This function determines whether to load personalized recommendations
-   * (for existing users with preferences) or mixed content (for new users).
-   * It sets up the initial card stack with the first 5 cards.
-   */
+  const extractMovieMetadata = (item: Movie | TVShow): MovieMetadata => {
+    const isMovie = 'title' in item;
+    const releaseDate = isMovie ? item.release_date : item.first_air_date;
+    const releaseYear = releaseDate ? new Date(releaseDate).getFullYear() : 0;
+    
+    return {
+      title: isMovie ? item.title : item.name,
+      genres: item.genre_ids || [],
+      releaseYear,
+      popularity: item.popularity || 0,
+      isMovie
+    };
+  };
+  
   const loadInitialCards = async () => {
+    if (isLoadingRef.current) return;
+    
     try {
+      isLoadingRef.current = true;
       setIsLoading(true);
+      
+      console.log('🔄 Starting to load initial cards...');
+      console.log('👤 User:', user ? 'Authenticated' : 'Not authenticated');
+      
       let initialCards: (Movie | TVShow)[] = [];
       
-      // Decide between personalized vs general content
-      if (user && (user.preferences.likedMovies.length > 0 || user.preferences.genres.length > 0)) {
-        // Personalized recommendations
-
+      if (user && user.preferences && (user.preferences.likedMovies?.length > 0 || user.preferences.genres?.length > 0)) {
+        console.log('🎯 Loading personalized recommendations...');
         await cleanupInvalidUserPreferences();
         const swipedIdsArray = Array.from(swipedCardIds);
         initialCards = await recommendationService.getPersonalizedRecommendations(
@@ -199,7 +137,7 @@ export default function SwipeScreen(): React.ReactElement {
           swipedIdsArray
         );
       } else {
-        // General popular content for new users - load from multiple pages
+        console.log('🎬 Loading general content...');
         const [page1, page2, page3] = await Promise.all([
           movieApi.getMixedContent(1),
           movieApi.getMixedContent(2),
@@ -210,32 +148,33 @@ export default function SwipeScreen(): React.ReactElement {
         initialCards = allContent.filter(card => !swipedIdsArray.includes(card.id));
       }
       
-      // Shuffle the initial cards for better randomness
-      const shuffledCards = shuffleArray(initialCards);
+      console.log(`📦 Loaded ${initialCards.length} cards`);
       
+      const shuffledCards = shuffleArray(initialCards);
       setAllCards(shuffledCards);
-      // Initialize card stack with first 5 cards
       setCardStack(shuffledCards.slice(0, 5));
+      
+      console.log(`🎴 Set card stack with ${shuffledCards.slice(0, 5).length} cards`);
+      
     } catch (error) {
-      console.error('Error loading initial cards:', error);
+      console.error('❌ Error loading initial cards:', error);
       Alert.alert('Error', 'Failed to load movies and TV shows');
     } finally {
       setIsLoading(false);
+      isLoadingRef.current = false;
+      console.log('✅ Finished loading initial cards');
     }
   };
 
   const loadMoreCards = async () => {
-    if (isLoadingMore) return;
-
+    if (isLoadingRef.current) return;
+    
     try {
-      setIsLoadingMore(true);
+      isLoadingRef.current = true;
+      
       let newCards: (Movie | TVShow)[] = [];
       
-
-      // Decide between personalized vs general content
-      if (user && (user.preferences.likedMovies.length > 0 || user.preferences.genres.length > 0)) {
-        // Personalized recommendations
-
+      if (user && user.preferences && (user.preferences.likedMovies?.length > 0 || user.preferences.genres?.length > 0)) {
         await cleanupInvalidUserPreferences();
         const swipedIdsArray = Array.from(swipedCardIds);
         newCards = await recommendationService.getPersonalizedRecommendations(
@@ -244,7 +183,6 @@ export default function SwipeScreen(): React.ReactElement {
           swipedIdsArray
         );
       } else {
-        // General content from multiple pages for better diversity
         const currentPage = Math.floor(allCards.length / 20) + 1;
         const [page1, page2] = await Promise.all([
           movieApi.getMixedContent(currentPage),
@@ -255,36 +193,54 @@ export default function SwipeScreen(): React.ReactElement {
         newCards = allNewContent.filter(card => !swipedIdsArray.includes(card.id));
       }
       
-      // Filter out cards that are recently shown (swiped cards already filtered above)
-      const filteredNewCards = newCards.filter(card => 
-        !recentlyShownIds.has(card.id)
-      );
-      
-      // Shuffle new cards before adding to prevent clustering
+      const filteredNewCards = newCards.filter(card => !recentlyShownIds.has(card.id));
       const shuffledNewCards = shuffleArray(filteredNewCards);
-      setAllCards(prev => [...prev, ...shuffledNewCards]);
       
-      console.log(`Loaded ${shuffledNewCards.length} new cards (filtered from ${newCards.length} total, excluded ${newCards.length - filteredNewCards.length} recently shown)`);
+      setAllCards(prev => [...prev, ...shuffledNewCards]);
+      console.log(`Loaded ${shuffledNewCards.length} new cards`);
+      
     } catch (error) {
       console.error('Error loading more cards:', error);
-      // If loading fails, try to reload everything
-      if (allCards.length === 0) {
-        console.log('Loading failed and no cards available, attempting full reload...');
-        loadInitialCards();
-      }
     } finally {
-      setIsLoadingMore(false);
+      isLoadingRef.current = false;
     }
   };
 
-  const moveToNextCard = useCallback(() => {
-    console.log('moveToNextCard called, current stack length:', cardStack.length);
+  const refillCardStack = useCallback(() => {
     setCardStack(prevStack => {
-      console.log('Previous stack:', prevStack.map(card => 'title' in card ? card.title : card.name));
-      const newStack = prevStack.slice(1); // Remove the top card
-      console.log('New stack after slice:', newStack.map(card => 'title' in card ? card.title : card.name));
+      if (prevStack.length >= 5) return prevStack;
       
-      // Add the next recommended card to maintain 5 cards
+      const availableCards = allCards.filter(card => 
+        !swipedCardIds.has(card.id) && !recentlyShownIds.has(card.id)
+      );
+      const cardsNotInStack = availableCards.filter(card => 
+        !prevStack.some(stackCard => stackCard.id === card.id)
+      );
+      
+      if (cardsNotInStack.length > 0) {
+        const shuffledCards = shuffleArray(cardsNotInStack);
+        const cardsToAdd = shuffledCards.slice(0, 5 - prevStack.length);
+        
+        setRecentlyShownIds(prev => {
+          const newSet = new Set(prev);
+          cardsToAdd.forEach(card => newSet.add(card.id));
+          return newSet;
+        });
+        
+        return [...prevStack, ...cardsToAdd];
+      } else if (allCards.length > 0) {
+        // Trigger loading more cards
+        loadMoreCards();
+      }
+      
+      return prevStack;
+    });
+  }, [allCards, swipedCardIds, recentlyShownIds]);
+
+  const moveToNextCard = useCallback(() => {
+    setCardStack(prevStack => {
+      const newStack = prevStack.slice(1);
+      
       const availableCards = allCards.filter(card => 
         !swipedCardIds.has(card.id) && !recentlyShownIds.has(card.id)
       );
@@ -293,87 +249,43 @@ export default function SwipeScreen(): React.ReactElement {
       );
       
       if (cardsNotInStack.length > 0) {
-        // Shuffle available cards to add randomness
         const shuffledCards = shuffleArray(cardsNotInStack);
         const nextCard = shuffledCards[0];
         newStack.push(nextCard);
         
-        // Add to recently shown tracking
         setRecentlyShownIds(prev => new Set([...prev, nextCard.id]));
-      } else {
-        // No more cards available, trigger loading more
-        console.log('No more cards available in moveToNextCard, triggering loadMoreCards');
+      } else if (allCards.length > 0) {
         loadMoreCards();
       }
       
       return newStack;
     });
-  }, [allCards, swipedCardIds, recentlyShownIds, loadMoreCards]);
+  }, [allCards, swipedCardIds, recentlyShownIds]);
 
-  const handleSwipeLeft = useCallback(async (item: Movie | TVShow) => {
-    console.log('handleSwipeLeft called with:', 'title' in item ? item.title : item.name);
-    
-    // Mark this card as swiped
-    setSwipedCardIds(prev => new Set([...prev, item.id]));
-    
-    // Update user preferences
-    if (user) {
-      const updatedDisliked = [...user.preferences.dislikedMovies, item.id];
-      await updatePreferences({ dislikedMovies: updatedDisliked });
-      console.log('Updated disliked movies');
+  // ==================== EFFECTS ====================
+  
+  // Initialize on mount - only run once
+  useEffect(() => {
+    console.log('🚀 SwipeScreen mounted, hasInitialized:', hasInitializedRef.current);
+    if (!hasInitializedRef.current) {
+      console.log('🎬 Initializing SwipeScreen...');
+      hasInitializedRef.current = true;
+      loadInitialCards();
     }
+  }, []);
 
-    // Move to next card immediately
-    moveToNextCard();
-    
-    // Load more cards if we're running low
-    const availableCards = allCards.filter(card => !swipedCardIds.has(card.id));
-    if (availableCards.length < 15) {
-      loadMoreCards();
+  // Refill card stack when needed - stable dependencies
+  useEffect(() => {
+    if (cardStack.length < 5 && allCards.length > 0 && !isLoading) {
+      const timeoutId = setTimeout(refillCardStack, 100);
+      return () => clearTimeout(timeoutId);
     }
-  }, [user, updatePreferences, moveToNextCard, allCards.length, swipedCardIds.size]);
+  }, [cardStack.length, allCards.length, isLoading, refillCardStack]);
 
-  const handleSwipeRight = useCallback(async (item: Movie | TVShow) => {
-    console.log('handleSwipeRight called with:', 'title' in item ? item.title : item.name);
-    
-    // Mark this card as swiped
-    setSwipedCardIds(prev => new Set([...prev, item.id]));
-    
-    // Update user preferences
-    if (user) {
-      const updatedLiked = [...user.preferences.likedMovies, item.id];
-      const updatedWatchlist = [...user.preferences.watchlist, item.id];
-      await updatePreferences({ 
-        likedMovies: updatedLiked,
-        watchlist: updatedWatchlist 
-      });
-      console.log('Updated liked movies and watchlist');
-    }
-
-    // Move to next card immediately
-    moveToNextCard();
-    
-    // Load more cards if we're running low
-    const availableCards = allCards.filter(card => !swipedCardIds.has(card.id));
-    if (availableCards.length < 15) {
-      loadMoreCards();
-    }
-  }, [user, updatePreferences, moveToNextCard, allCards.length, swipedCardIds.size]);
-
-  const handleRefresh = () => {
-    // Clear swiped cards and reload everything fresh
-    setSwipedCardIds(new Set());
-    setRecentlyShownIds(new Set());
-    setAllCards([]);
-    setCardStack([]);
-    loadInitialCards();
-  };
-
-  // Periodically clear recently shown cards to allow them to be shown again
+  // Clear recently shown cards periodically
   useEffect(() => {
     const interval = setInterval(() => {
       setRecentlyShownIds(prev => {
-        // Keep only the last 20 recently shown cards to prevent memory buildup
         const recentArray = Array.from(prev);
         if (recentArray.length > 20) {
           const keepRecent = recentArray.slice(-20);
@@ -381,12 +293,87 @@ export default function SwipeScreen(): React.ReactElement {
         }
         return prev;
       });
-    }, 30000); // Clear every 30 seconds
+    }, 30000);
 
     return () => clearInterval(interval);
   }, []);
 
+  // ==================== EVENT HANDLERS ====================
+  
+  const handleSwipeLeft = useCallback(async (item: Movie | TVShow) => {
+    console.log('handleSwipeLeft called with:', 'title' in item ? item.title : item.name);
+    
+    setSwipedCardIds(prev => new Set([...prev, item.id]));
+    
+    if (user && user.preferences) {
+      const updatedDisliked = [...(user.preferences.dislikedMovies || []), item.id];
+      await updatePreferences({ dislikedMovies: updatedDisliked });
+      
+      // Record interaction for ML
+      try {
+        const movieMetadata = extractMovieMetadata(item);
+        await recordMovieInteraction(item.id, 'disliked', movieMetadata);
+      } catch (error) {
+        console.error('Error recording disliked interaction:', error);
+      }
+    }
+
+    moveToNextCard();
+    
+    // Load more cards if running low
+    const availableCards = allCards.filter(card => !swipedCardIds.has(card.id));
+    if (availableCards.length < 15) {
+      loadMoreCards();
+    }
+  }, [user, updatePreferences, recordMovieInteraction, moveToNextCard, allCards, swipedCardIds]);
+
+  const handleSwipeRight = useCallback(async (item: Movie | TVShow) => {
+    console.log('handleSwipeRight called with:', 'title' in item ? item.title : item.name);
+    
+    setSwipedCardIds(prev => new Set([...prev, item.id]));
+    
+    if (user && user.preferences) {
+      const updatedLiked = [...(user.preferences.likedMovies || []), item.id];
+      const updatedWatchlist = [...(user.preferences.watchlist || []), item.id];
+      await updatePreferences({ 
+        likedMovies: updatedLiked,
+        watchlist: updatedWatchlist 
+      });
+      
+      // Record interactions for ML
+      try {
+        const movieMetadata = extractMovieMetadata(item);
+        await recordMovieInteraction(item.id, 'liked', movieMetadata);
+        await recordMovieInteraction(item.id, 'watchlisted', movieMetadata);
+      } catch (error) {
+        console.error('Error recording liked/watchlisted interactions:', error);
+      }
+    }
+
+    moveToNextCard();
+    
+    // Load more cards if running low
+    const availableCards = allCards.filter(card => !swipedCardIds.has(card.id));
+    if (availableCards.length < 15) {
+      loadMoreCards();
+    }
+  }, [user, updatePreferences, recordMovieInteraction, moveToNextCard, allCards, swipedCardIds]);
+
+  const handleRefresh = useCallback(() => {
+    setSwipedCardIds(new Set());
+    setRecentlyShownIds(new Set());
+    setAllCards([]);
+    setCardStack([]);
+    hasInitializedRef.current = false;
+    loadInitialCards();
+  }, []);
+
+  // ==================== RENDER ====================
+  
+  console.log('🎭 SwipeScreen render - isLoading:', isLoading, 'cardStack.length:', cardStack.length, 'allCards.length:', allCards.length);
+  
   if (isLoading) {
+    console.log('⏳ Showing loading screen...');
     return (
       <ThemedView style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#3A5683" />
@@ -396,38 +383,27 @@ export default function SwipeScreen(): React.ReactElement {
   }
 
   if (cardStack.length === 0) {
-    // If we have no cards and we're not loading, try to reload
-    if (!isLoading && !isLoadingMore) {
-      console.log('Card stack is empty and not loading, attempting to reload...');
-      loadInitialCards();
-    }
-    
+    console.log('🔍 Showing "Finding great picks" screen...');
     return (
       <ThemedView style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#3A5683" />
         <ThemedText style={styles.loadingText}>Finding great picks for you...</ThemedText>
-        <ThemedText style={styles.loadingSubtext}>
-          {isLoading ? 'Loading content...' : 'Refreshing recommendations...'}
-        </ThemedText>
+        <ThemedText style={styles.loadingSubtext}>Refreshing recommendations...</ThemedText>
       </ThemedView>
     );
   }
-  
+
+  console.log('🎴 Showing card stack with', cardStack.length, 'cards');
 
   return (
     <ThemedView style={styles.container}>
-
       <View style={styles.cardContainer}>
-        {/* Render cards in reverse order (furthest back first) */}
         {cardStack.map((card, index) => {
           const isTopCard = index === 0;
           const isNextCard = index === 1;
           const isThirdCard = index === 2;
           const isFourthCard = index === 3;
           const isFifthCard = index === 4;
-          
-          // Debug logging
-          console.log(`Card ${index}: ${'title' in card ? card.title : card.name}, isTopCard: ${isTopCard}`);
           
           return (
             <MovieCard
@@ -444,8 +420,6 @@ export default function SwipeScreen(): React.ReactElement {
           );
         })}
       </View>
-
-      {/* footer removed to allow full-height card */}
     </ThemedView>
   );
 }
@@ -470,6 +444,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#000000', // Black text on primary background
   },
+
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -515,5 +490,4 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     position: 'relative',
   },
-  
 });

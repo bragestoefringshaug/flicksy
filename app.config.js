@@ -65,10 +65,8 @@ export default {
           backgroundColor: "#ffffff"
         }
       ],
-      "expo-secure-store",
       "expo-font",
-      "expo-web-browser",
-      "expo-sqlite"
+      "expo-web-browser"
     ],
     experiments: {
       typedRoutes: true

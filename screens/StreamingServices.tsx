@@ -7,6 +7,7 @@
  */
 import React, { useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { ThemedText } from '../components/ThemedText';
 import { ThemedView } from '../components/ThemedView';
 import { useAuth } from '../contexts/AuthContext';
@@ -24,6 +25,7 @@ const ALL_SERVICES: { key: ServiceKey; label: string }[] = [
 
 export default function StreamingServices() {
   const { user, updatePreferences } = useAuth();
+  const router = useRouter();
 
   // Keep a Set for quick toggle checks and to avoid duplicates
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -48,6 +50,17 @@ export default function StreamingServices() {
     setIsSaving(true);
     try {
       await updatePreferences({ streamingServices: Array.from(selected) });
+      
+      // Check if this is during onboarding (user has no genres selected)
+      const needsGenres = !user?.preferences?.genres || user.preferences.genres.length === 0;
+      
+      if (needsGenres) {
+        // Continue to genre selection during onboarding
+        router.push('/genre-selection' as any);
+      } else {
+        // Go back if user is just updating preferences
+        router.back();
+      }
     } finally {
       setIsSaving(false);
     }
@@ -87,7 +100,7 @@ export default function StreamingServices() {
           style={[styles.saveButton, isSaving && styles.saveButtonDisabled]}
           disabled={isSaving}
         >
-          <Text style={styles.saveButtonText}>{isSaving ? 'Saving…' : 'Save Preferences'}</Text>
+          <Text style={styles.saveButtonText}>{isSaving ? 'Saving…' : 'Save and Continue'}</Text>
         </TouchableOpacity>
       </View>
     </ThemedView>

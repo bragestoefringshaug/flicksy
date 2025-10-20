@@ -3,11 +3,11 @@ import { ThemedView } from '@/components/ThemedView';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, type Href } from 'expo-router';
 import {
-  Alert,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  View
+    Alert,
+    ScrollView,
+    StyleSheet,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -51,32 +51,28 @@ export default function ProfileScreen() {
 
         <View style={styles.statsContainer}>
           <View style={styles.statItem}>
-            <ThemedText style={styles.statNumber}>{user?.preferences.likedMovies.length || 0}</ThemedText>
+            <ThemedText style={styles.statNumber}>{user?.preferences?.likedMovies?.length || 0}</ThemedText>
             <ThemedText style={styles.statLabel}>Liked</ThemedText>
           </View>
           <View style={styles.statItem}>
-            <ThemedText style={styles.statNumber}>{user?.preferences.watchlist.length || 0}</ThemedText>
+            <ThemedText style={styles.statNumber}>{user?.preferences?.watchlist?.length || 0}</ThemedText>
             <ThemedText style={styles.statLabel}>Watchlist</ThemedText>
           </View>
           <View style={styles.statItem}>
-            <ThemedText style={styles.statNumber}>{user?.preferences.dislikedMovies.length || 0}</ThemedText>
+            <ThemedText style={styles.statNumber}>{user?.preferences?.dislikedMovies?.length || 0}</ThemedText>
             <ThemedText style={styles.statLabel}>Disliked</ThemedText>
           </View>
         </View>
 
         <View style={styles.menuContainer}>
 
-          <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/(tabs)/preferences')}>
+          <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/preferences')}>
             <Ionicons name="list-outline" size={24} color="#666" />
             <ThemedText style={styles.menuText}>Preferences</ThemedText>
             <Ionicons name="chevron-forward" size={20} color="#ccc" />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem}> </TouchableOpacity>
-
-          {/* Settings -> open the Streaming Services screen so users can update preferences later */}
-          <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/streaming-services' as Href)}>
-
+          <TouchableOpacity style={styles.menuItem}>
             <Ionicons name="settings-outline" size={24} color="#666" />
             <ThemedText style={styles.menuText}>Settings</ThemedText>
             <Ionicons name="chevron-forward" size={20} color="#ccc" />

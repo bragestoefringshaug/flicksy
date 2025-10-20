@@ -3,20 +3,28 @@
  * 
  * Provides authentication state and methods throughout the app.
  * Manages user login, registration, logout, and preference updates.
- * Uses AsyncStorage for persistent user session management.
+ * Uses Firebase Authentication for user management and Firebase Realtime Database for data storage.
  * 
  * @author Flicksy Team
- * @version 1.0.0
+ * @version 2.0.0
  */
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+    createUserWithEmailAndPassword,
+    User as FirebaseUser,
+    onAuthStateChanged,
+    signInWithEmailAndPassword,
+    signOut
+} from 'firebase/auth';
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { auth } from '../services/firebase';
+import { createUser, getUser, MovieInteraction, MovieMetadata, recordInteraction, updateUserPreferences } from '../services/firebaseDb';
 
 /**
  * User interface defining the structure of user data
  */
 interface User {
-  id: string; // Unique user identifier
+  id: string; // Firebase UID
   email: string; // User's email address
   name: string; // User's display name
   preferences: {
@@ -25,7 +33,7 @@ interface User {
     dislikedMovies: number[]; // Array of disliked movie IDs
     watchlist: number[]; // Array of watchlist movie/TV show IDs
     seen: number[]; // Array of seen movie/TV show IDs
-    streamingServices?: string[]; // User's selected streaming services
+    streamingServices: string[]; // User's selected streaming services
   };
 }
 
@@ -39,6 +47,7 @@ interface AuthContextType {
   register: (email: string, password: string, name: string) => Promise<boolean>; // Registration method
   logout: () => Promise<void>; // Logout method
   updatePreferences: (preferences: Partial<User['preferences']>) => Promise<void>; // Update user preferences
+  recordMovieInteraction: (movieId: number, action: 'liked' | 'disliked' | 'watchlisted' | 'seen', movieMetadata: MovieMetadata) => Promise<void>; // Record movie interaction for ML
 }
 
 // Create the authentication context
@@ -75,54 +84,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // ==================== EFFECTS ====================
   
   /**
-   * Load user data from AsyncStorage on component mount
+   * Listen to Firebase authentication state changes
    */
   useEffect(() => {
-    loadUser();
-  }, []);
-
-  // ==================== AUTHENTICATION METHODS ====================
-  
-  /**
-   * Load user data from persistent storage
-   * 
-   * Attempts to retrieve and parse user data from AsyncStorage.
-   * Sets loading state to false when complete.
-   */
-  const loadUser = async () => {
-    try {
-      const userData = await AsyncStorage.getItem('user');
-      if (userData) {
-        const parsed = JSON.parse(userData);
-        // Normalize missing fields for backward compatibility
-        if (!parsed.preferences) parsed.preferences = {};
-        if (!Array.isArray(parsed.preferences.seen)) parsed.preferences.seen = [];
-        setUser(parsed);
-        // Persist normalization back to storage
-        await AsyncStorage.setItem('user', JSON.stringify(parsed));
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
+      if (firebaseUser) {
+        // User is signed in, get their data from Firebase Realtime Database
+        try {
+          const userData = await getUser(firebaseUser.uid);
+          if (userData) {
+            setUser({
+              id: firebaseUser.uid,
+              email: firebaseUser.email || '',
+              name: userData.name || '',
+              preferences: userData.preferences
+            });
+          }
+        } catch (error) {
+          console.error('Error loading user data:', error);
+        }
+      } else {
+        // User is signed out
+        setUser(null);
       }
-    } catch (error) {
-      console.error('Error loading user:', error);
-    } finally {
       setIsLoading(false);
-    }
-  };
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
-      // In a real app, this would make an API call
-      // For now, we'll simulate authentication
-      const userData = await AsyncStorage.getItem(`user_${email}`);
-      if (userData) {
-        const user = JSON.parse(userData);
-        if (user.password === password) {
-          delete user.password; // Remove password from stored user object
-          setUser(user);
-          await AsyncStorage.setItem('user', JSON.stringify(user));
-          return true;
-        }
-      }
-      return false;
+      await signInWithEmailAndPassword(auth, email, password);
+      return true;
     } catch (error) {
       console.error('Login error:', error);
       return false;
@@ -131,14 +125,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const register = async (email: string, password: string, name: string): Promise<boolean> => {
     try {
-      // Check if user already exists
-      const existingUser = await AsyncStorage.getItem(`user_${email}`);
-      if (existingUser) {
-        return false;
-      }
-
-      const newUser: User = {
-        id: Date.now().toString(),
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const firebaseUser = userCredential.user;
+      
+      // Create user document in Firebase Realtime Database
+      await createUser(firebaseUser.uid, {
         email,
         name,
         preferences: {
@@ -148,14 +139,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           watchlist: [],
           seen: [],
           streamingServices: [],
-        },
-      };
-
-      // Store user with password for login simulation
-      await AsyncStorage.setItem(`user_${email}`, JSON.stringify({ ...newUser, password }));
+        }
+      });
       
-      setUser(newUser);
-      await AsyncStorage.setItem('user', JSON.stringify(newUser));
       return true;
     } catch (error) {
       console.error('Registration error:', error);
@@ -165,8 +151,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     try {
-      await AsyncStorage.removeItem('user');
-      setUser(null);
+      await signOut(auth);
     } catch (error) {
       console.error('Logout error:', error);
     }
@@ -175,27 +160,50 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const updatePreferences = async (preferences: Partial<User['preferences']>) => {
     if (!user) return;
 
-    const updatedUser = {
-      ...user,
-      preferences: { ...user.preferences, ...preferences },
-    };
-
     try {
+      // Update preferences in Firebase Realtime Database
+      await updateUserPreferences(user.id, preferences);
+      
+      // Update local state
+      const updatedUser = {
+        ...user,
+        preferences: { ...user.preferences, ...preferences },
+      };
       setUser(updatedUser);
-      await AsyncStorage.setItem('user', JSON.stringify(updatedUser));
-      // Also update the user data with password
-      const userWithPassword = await AsyncStorage.getItem(`user_${user.email}`);
-      if (userWithPassword) {
-        const userData = JSON.parse(userWithPassword);
-        await AsyncStorage.setItem(`user_${user.email}`, JSON.stringify({ ...userData, preferences: updatedUser.preferences }));
-      }
     } catch (error) {
       console.error('Error updating preferences:', error);
     }
   };
 
+  /**
+   * Record a movie interaction for ML purposes
+   */
+  const recordMovieInteraction = async (
+    movieId: number, 
+    action: 'liked' | 'disliked' | 'watchlisted' | 'seen', 
+    movieMetadata: MovieMetadata
+  ) => {
+    if (!user) {
+      throw new Error('No user logged in');
+    }
+
+    try {
+      const interaction: MovieInteraction = {
+        movieId,
+        action,
+        timestamp: Date.now(),
+        movieMetadata
+      };
+
+      await recordInteraction(user.id, interaction);
+    } catch (error) {
+      console.error('Error recording movie interaction:', error);
+      throw error;
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, register, logout, updatePreferences }}>
+    <AuthContext.Provider value={{ user, isLoading, login, register, logout, updatePreferences, recordMovieInteraction }}>
       {children}
     </AuthContext.Provider>
   );
