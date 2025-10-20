@@ -25,6 +25,7 @@ import MovieCard from '../components/MovieCard';
 import { ThemedText } from '../components/ThemedText';
 import { ThemedView } from '../components/ThemedView';
 import { useAuth } from '../contexts/AuthContext';
+import { MovieMetadata } from '../services/firebaseDb';
 import { Movie, movieApi, TVShow } from '../services/movieApi';
 import { recommendationService } from '../services/recommendationService';
 
@@ -37,7 +38,7 @@ const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 export default function SwipeScreen(): React.ReactElement {
   // ==================== HOOKS AND STATE ====================
   
-  const { user, updatePreferences } = useAuth();
+  const { user, updatePreferences, recordMovieInteraction } = useAuth();
   
   // Core state - simplified
   const [allCards, setAllCards] = useState<(Movie | TVShow)[]>([]);
@@ -96,6 +97,23 @@ export default function SwipeScreen(): React.ReactElement {
   };
 
   // ==================== CORE FUNCTIONS ====================
+  
+  /**
+   * Extract movie metadata for ML purposes
+   */
+  const extractMovieMetadata = (item: Movie | TVShow): MovieMetadata => {
+    const isMovie = 'title' in item;
+    const releaseDate = isMovie ? item.release_date : item.first_air_date;
+    const releaseYear = releaseDate ? new Date(releaseDate).getFullYear() : 0;
+    
+    return {
+      title: isMovie ? item.title : item.name,
+      genres: item.genre_ids || [],
+      releaseYear,
+      popularity: item.popularity || 0,
+      isMovie
+    };
+  };
   
   const loadInitialCards = async () => {
     if (isLoadingRef.current) return;
@@ -290,6 +308,14 @@ export default function SwipeScreen(): React.ReactElement {
     if (user && user.preferences) {
       const updatedDisliked = [...(user.preferences.dislikedMovies || []), item.id];
       await updatePreferences({ dislikedMovies: updatedDisliked });
+      
+      // Record interaction for ML
+      try {
+        const movieMetadata = extractMovieMetadata(item);
+        await recordMovieInteraction(item.id, 'disliked', movieMetadata);
+      } catch (error) {
+        console.error('Error recording disliked interaction:', error);
+      }
     }
 
     moveToNextCard();
@@ -299,7 +325,7 @@ export default function SwipeScreen(): React.ReactElement {
     if (availableCards.length < 15) {
       loadMoreCards();
     }
-  }, [user, updatePreferences, moveToNextCard, allCards, swipedCardIds]);
+  }, [user, updatePreferences, recordMovieInteraction, moveToNextCard, allCards, swipedCardIds]);
 
   const handleSwipeRight = useCallback(async (item: Movie | TVShow) => {
     console.log('handleSwipeRight called with:', 'title' in item ? item.title : item.name);
@@ -313,6 +339,15 @@ export default function SwipeScreen(): React.ReactElement {
         likedMovies: updatedLiked,
         watchlist: updatedWatchlist 
       });
+      
+      // Record interactions for ML
+      try {
+        const movieMetadata = extractMovieMetadata(item);
+        await recordMovieInteraction(item.id, 'liked', movieMetadata);
+        await recordMovieInteraction(item.id, 'watchlisted', movieMetadata);
+      } catch (error) {
+        console.error('Error recording liked/watchlisted interactions:', error);
+      }
     }
 
     moveToNextCard();
@@ -322,7 +357,7 @@ export default function SwipeScreen(): React.ReactElement {
     if (availableCards.length < 15) {
       loadMoreCards();
     }
-  }, [user, updatePreferences, moveToNextCard, allCards, swipedCardIds]);
+  }, [user, updatePreferences, recordMovieInteraction, moveToNextCard, allCards, swipedCardIds]);
 
   const handleRefresh = useCallback(() => {
     setSwipedCardIds(new Set());
