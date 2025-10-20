@@ -18,7 +18,7 @@ import {
 } from 'firebase/auth';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { auth } from '../services/firebase';
-import { createUser, getUser, updateUserPreferences } from '../services/firebaseDb';
+import { createUser, getUser, MovieInteraction, MovieMetadata, recordInteraction, updateUserPreferences } from '../services/firebaseDb';
 
 /**
  * User interface defining the structure of user data
@@ -47,6 +47,7 @@ interface AuthContextType {
   register: (email: string, password: string, name: string) => Promise<boolean>; // Registration method
   logout: () => Promise<void>; // Logout method
   updatePreferences: (preferences: Partial<User['preferences']>) => Promise<void>; // Update user preferences
+  recordMovieInteraction: (movieId: number, action: 'liked' | 'disliked' | 'watchlisted' | 'seen', movieMetadata: MovieMetadata) => Promise<void>; // Record movie interaction for ML
 }
 
 // Create the authentication context
@@ -174,8 +175,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  /**
+   * Record a movie interaction for ML purposes
+   */
+  const recordMovieInteraction = async (
+    movieId: number, 
+    action: 'liked' | 'disliked' | 'watchlisted' | 'seen', 
+    movieMetadata: MovieMetadata
+  ) => {
+    if (!user) {
+      throw new Error('No user logged in');
+    }
+
+    try {
+      const interaction: MovieInteraction = {
+        movieId,
+        action,
+        timestamp: Date.now(),
+        movieMetadata
+      };
+
+      await recordInteraction(user.id, interaction);
+    } catch (error) {
+      console.error('Error recording movie interaction:', error);
+      throw error;
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, register, logout, updatePreferences }}>
+    <AuthContext.Provider value={{ user, isLoading, login, register, logout, updatePreferences, recordMovieInteraction }}>
       {children}
     </AuthContext.Provider>
   );
