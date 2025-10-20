@@ -1,29 +1,38 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Animated,
-    FlatList,
-    Image,
-    Modal,
-    PanResponder,
-    RefreshControl,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Animated,
+  FlatList,
+  Image,
+  Modal,
+  PanResponder,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { ThemedText } from '../components/ThemedText';
 import { ThemedView } from '../components/ThemedView';
 import { ALL_GENRES } from '../constants/Genres';
 import { useAuth } from '../contexts/AuthContext';
-import { Movie, movieApi } from '../services/movieApi';
+import { movieApi } from '../services/movieApi';
 
-interface WatchlistItem extends Movie {
-  isMovie: boolean;
+interface WatchlistItem {
+  id: number;
+  title?: string;
   name?: string;
+  overview: string;
+  poster_path: string | null;
+  backdrop_path: string | null;
+  release_date?: string;
   first_air_date?: string;
+  vote_average: number;
+  vote_count: number;
+  genre_ids: number[];
+  isMovie: boolean;
   genreNames: string[];
 }
 
@@ -38,10 +47,14 @@ const WatchlistRow: React.FC<WatchlistRowProps> = ({ item, onMarkSeen, onDelete 
   const releaseDate = item.isMovie ? item.release_date : (item.first_air_date || '');
   const year = releaseDate ? new Date(releaseDate).getFullYear() : 'N/A';
   const posterUrl = movieApi.getImageUrl(item.poster_path, 'w185');
+  
+  // Static reveal text; swipe action handles marking as seen
 
   const translateX = React.useRef(new Animated.Value(0)).current;
+  const [eyeFilled, setEyeFilled] = React.useState(false);
+  const [revealLabel, setRevealLabel] = React.useState<'Not Seen' | 'Seen'>('Not Seen');
   const seenTextOpacity = translateX.interpolate({
-    inputRange: [-120, -40, 0],
+    inputRange: [-160, -80, 0],
     outputRange: [1, 0.4, 0],
     extrapolate: 'clamp',
   });
@@ -56,7 +69,7 @@ const WatchlistRow: React.FC<WatchlistRowProps> = ({ item, onMarkSeen, onDelete 
         }
       },
       onPanResponderRelease: async (_, gesture) => {
-        const threshold = -120;
+        const threshold = -160;
         if (gesture.dx < threshold) {
           onMarkSeen(item.id);
         } else {
@@ -67,7 +80,7 @@ const WatchlistRow: React.FC<WatchlistRowProps> = ({ item, onMarkSeen, onDelete 
   ).current;
 
   const handleNudgeSeen = () => {
-    Animated.spring(translateX, { toValue: -80, useNativeDriver: false }).start(() => {
+    Animated.spring(translateX, { toValue: -120, useNativeDriver: false }).start(() => {
       Animated.spring(translateX, { toValue: 0, useNativeDriver: false }).start();
     });
   };
@@ -75,7 +88,7 @@ const WatchlistRow: React.FC<WatchlistRowProps> = ({ item, onMarkSeen, onDelete 
   return (
     <View style={styles.swipeContainer}>
       <View style={styles.revealRight}>
-        <Animated.Text style={[styles.revealText, { opacity: seenTextOpacity }]}>Seen</Animated.Text>
+        <Animated.Text style={[styles.revealText, { opacity: seenTextOpacity }]}>{revealLabel}</Animated.Text>
       </View>
       <Animated.View style={[styles.itemContainer, { transform: [{ translateX }] }]} {...panResponder.panHandlers}>
       <Image
@@ -95,15 +108,21 @@ const WatchlistRow: React.FC<WatchlistRowProps> = ({ item, onMarkSeen, onDelete 
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <TouchableOpacity
               style={styles.removeButton}
-              onPress={handleNudgeSeen}
+              onPress={() => {
+                // Keep original functionality (nudge only)
+                handleNudgeSeen();
+                // Toggle icon fill and label
+                setEyeFilled(prev => !prev);
+                setRevealLabel(prev => (prev === 'Seen' ? 'Not Seen' : 'Seen'));
+              }}
             >
-              <Ionicons name="checkmark-circle" size={24} color="#34C759" />
+              <Ionicons name={eyeFilled ? 'eye' : 'eye-outline'} size={24} color="#3A5683" />
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.removeButton}
               onPress={() => onDelete(item.id)}
             >
-              <Ionicons name="close-circle" size={24} color="#F44336" />
+              <Ionicons name="close-circle-outline" size={24} color="#F44336" />
             </TouchableOpacity>
           </View>
         </View>
@@ -287,7 +306,7 @@ export default function WatchlistScreen() {
   if (isLoading) {
     return (
       <ThemedView style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
+        <ActivityIndicator size="large" color="#3A5683" />
         <ThemedText style={styles.loadingText}>Loading your watchlist...</ThemedText>
       </ThemedView>
     );
@@ -299,7 +318,7 @@ export default function WatchlistScreen() {
         <ThemedText style={styles.headerTitle}>My Watchlist</ThemedText>
         <View style={styles.headerRight}>
           <TouchableOpacity style={styles.filterButton} onPress={() => setIsFilterOpen(true)}>
-            <Ionicons name="filter" size={18} color="#007AFF" />
+            <Ionicons name="filter" size={18} color="#FFFFFF" />
             <Text style={styles.filterButtonText}>Filter</Text>
           </TouchableOpacity>
         </View>
@@ -404,7 +423,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: '#666',
+    color: '#000000', // Black text on primary background
   },
   header: {
     paddingHorizontal: 20,
@@ -424,6 +443,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    marginTop: 8, // Added margin to create space between title and filter button
   },
   tabsRow: {
     flexDirection: 'row',
@@ -440,29 +460,29 @@ const styles = StyleSheet.create({
     backgroundColor: '#f7f7f7',
   },
   tabButtonActive: {
-    backgroundColor: '#007AFF22',
-    borderColor: '#007AFF',
+    backgroundColor: '#3A5683', // Secondary color for active tab
+    borderColor: '#3A5683',
   },
   tabButtonText: {
-    color: '#555',
+    color: '#000000', // Black text on tertiary background
     fontWeight: '600',
   },
   tabButtonTextActive: {
-    color: '#007AFF',
+    color: '#FFFFFF', // White text on secondary background
   },
   filterButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     borderWidth: 1,
-    borderColor: '#007AFF',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    borderColor: '#3A5683',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderRadius: 999,
-    backgroundColor: '#007AFF11',
+    backgroundColor: '#3A5683', // Secondary background
   },
   filterButtonText: {
-    color: '#007AFF',
+    color: '#FFFFFF', // White text on secondary
     fontWeight: '600',
   },
   listContainer: {
@@ -497,7 +517,7 @@ const styles = StyleSheet.create({
     zIndex: 0,
   },
   revealText: {
-    color: '#34C759',
+    color: '#000000', // Black text as requested
     fontWeight: '800',
     fontSize: 18,
   },
@@ -621,7 +641,10 @@ const styles = StyleSheet.create({
     maxWidth: 500,
     backgroundColor: '#fff',
     borderRadius: 12,
-    padding: 16,
+    paddingTop: 16,
+    paddingHorizontal: 16,
+    paddingBottom: 20, // Reduced bottom padding
+    height: 300, // Increased height to accommodate more spacing
   },
   modalTitle: {
     fontSize: 18,
@@ -632,38 +655,42 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
+    height: 120, // Increased height for chips area
+    justifyContent: 'flex-start',
+    alignItems: 'flex-start',
   },
   chip: {
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#ccc',
-    backgroundColor: '#fff',
+    borderColor: '#3A5683', // Secondary color for border
+    backgroundColor: '#FFFFFF', // Tertiary color for background
   },
   chipSelected: {
-    backgroundColor: '#007AFF22',
-    borderColor: '#007AFF',
+    backgroundColor: '#3A5683', // Secondary color for selected background
+    borderColor: '#3A5683',
   },
   chipText: {
     fontSize: 14,
+    color: '#000000', // Black text on tertiary background
   },
   chipTextSelected: {
-    color: '#007AFF',
+    color: '#FFFFFF', // White text on secondary background
     fontWeight: '600',
   },
   modalActions: {
-    marginTop: 16,
+    marginTop: 60, // Increased top margin to push Done button further down
     alignItems: 'flex-end',
   },
   modalButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#3A5683', // Secondary color for button
     borderRadius: 8,
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
   modalButtonText: {
-    color: 'white',
+    color: '#FFFFFF', // White text on secondary color
     fontWeight: '600',
   },
 });

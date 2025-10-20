@@ -1,10 +1,10 @@
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { ALL_GENRES } from '@/constants/Genres';
+import { useAuth } from '@/contexts/AuthContext';
 import { useNavigation, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, FlatList, Pressable, StyleSheet, View } from 'react-native';
-import { useAuth } from '@/contexts/AuthContext';
 
 // Use shared genre list
 
@@ -94,28 +94,32 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 8,
   },
+  // Make genre items look/behave like StreamingServices cards
   chip: {
     flex: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
     borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 999,
+    borderColor: '#3A5683',
+    borderRadius: 14,
     alignItems: 'center',
+    backgroundColor: '#FFFFFF',
   },
   chipSelected: {
-    backgroundColor: '#007AFF22',
-    borderColor: '#007AFF',
+    backgroundColor: '#3A5683',
+    borderColor: '#3A5683',
   },
   chipText: {
-    fontSize: 14,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#000000',
   },
   chipTextSelected: {
-    color: '#007AFF',
+    color: '#FFFFFF',
     fontWeight: '600',
   },
   saveButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#3A5683', // Secondary color for button
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 8,

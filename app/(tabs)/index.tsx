@@ -15,7 +15,7 @@ export default function HomeScreen() {
   if (isLoading) {
     return (
       <ThemedView style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
+        <ActivityIndicator size="large" color="#3A5683" />
         <ThemedText style={styles.loadingText}>Loading...</ThemedText>
       </ThemedView>
     );
@@ -47,6 +47,6 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: '#666',
+    color: '#000000', // Black text on primary background
   },
 });

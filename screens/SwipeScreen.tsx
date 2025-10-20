@@ -15,11 +15,11 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Dimensions,
-  StyleSheet,
-  View
+    ActivityIndicator,
+    Alert,
+    Dimensions,
+    StyleSheet,
+    View
 } from 'react-native';
 import MovieCard from '../components/MovieCard';
 import { ThemedText } from '../components/ThemedText';
@@ -389,7 +389,7 @@ export default function SwipeScreen(): React.ReactElement {
   if (isLoading) {
     return (
       <ThemedView style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
+        <ActivityIndicator size="large" color="#3A5683" />
         <ThemedText style={styles.loadingText}>Loading movies and TV shows...</ThemedText>
       </ThemedView>
     );
@@ -404,7 +404,7 @@ export default function SwipeScreen(): React.ReactElement {
     
     return (
       <ThemedView style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
+        <ActivityIndicator size="large" color="#3A5683" />
         <ThemedText style={styles.loadingText}>Finding great picks for you...</ThemedText>
         <ThemedText style={styles.loadingSubtext}>
           {isLoading ? 'Loading content...' : 'Refreshing recommendations...'}
@@ -463,12 +463,12 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: '#666',
+    color: '#000000', // Black text on primary background
   },
   loadingSubtext: {
     marginTop: 8,
     fontSize: 14,
-    color: '#999',
+    color: '#000000', // Black text on primary background
   },
   emptyContainer: {
     flex: 1,
@@ -504,7 +504,7 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   refreshButtonText: {
-    color: '#007AFF',
+    color: '#3A5683', // Secondary color for link text
     fontSize: 16,
     fontWeight: '600',
   },

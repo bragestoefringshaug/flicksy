@@ -5,7 +5,7 @@
  * We keep the UI selection in sync with `user.preferences.streamingServices`
  * so the screen works both during onboarding and later from Settings.
  */
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { ThemedText } from '../components/ThemedText';
 import { ThemedView } from '../components/ThemedView';
@@ -74,7 +74,7 @@ export default function StreamingServices() {
                 <View style={[styles.checkbox, isSelected && styles.checkboxSelected]}>
                   {isSelected && <Text style={styles.checkboxTick}>✓</Text>}
                 </View>
-                <ThemedText style={styles.cardLabel}>{label}</ThemedText>
+                <ThemedText style={[styles.cardLabel, isSelected && styles.cardLabelSelected]}>{label}</ThemedText>
               </TouchableOpacity>
             );
           })}
@@ -128,45 +128,49 @@ const styles = StyleSheet.create({
     width: '48%',
     marginBottom: 14,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#3A5683', // Secondary color for border
     borderRadius: 14,
     padding: 16,
-    backgroundColor: '#fff',
+    backgroundColor: '#FFFFFF', // Tertiary color for background
     flexDirection: 'row',
     alignItems: 'center',
   },
   cardSelected: {
-    borderColor: '#007AFF',
-    backgroundColor: '#EAF2FF',
+    borderColor: '#3A5683',
+    backgroundColor: '#3A5683', // Secondary color for selected background
   },
   checkbox: {
     width: 22,
     height: 22,
     borderRadius: 6,
     borderWidth: 2,
-    borderColor: '#ccc',
+    borderColor: '#3A5683', // Secondary color for border
     marginRight: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: '#FFFFFF', // Tertiary color for background
   },
   checkboxSelected: {
-    borderColor: '#007AFF',
-    backgroundColor: '#007AFF',
+    borderColor: '#FFFFFF', // White border on secondary background
+    backgroundColor: '#FFFFFF', // White background for checkmark
   },
   checkboxTick: {
-    color: '#fff',
+    color: '#3A5683', // Secondary color for checkmark
     fontWeight: 'bold',
   },
   cardLabel: {
     fontSize: 16,
     fontWeight: '600',
+    color: '#000000', // Black text on tertiary background
+  },
+  cardLabelSelected: {
+    color: '#FFFFFF', // White text when card is selected (secondary background)
   },
   footer: {
     padding: 20,
   },
   saveButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#3A5683', // Secondary color for button
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
@@ -175,7 +179,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#9EC6FF',
   },
   saveButtonText: {
-    color: '#fff',
+    color: '#FFFFFF', // White text on secondary color
     fontSize: 16,
     fontWeight: '600',
   },
