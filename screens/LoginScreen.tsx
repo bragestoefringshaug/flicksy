@@ -133,7 +133,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     textAlign: 'center',
     letterSpacing: 1,
-    color: '#007AFF',
+    color: '#000000', // Black text on primary background
   },
   subtitle: {
     fontSize: 16,
@@ -151,18 +151,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 8,
-    color: '#333',
+    color: '#000000', // Black text on primary background
   },
   input: {
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#3A5683', // Secondary color for border
     borderRadius: 12,
     padding: 16,
     fontSize: 16,
-    backgroundColor: '#fff',
+    backgroundColor: '#FFFFFF', // Tertiary color for background
+    color: '#000000', // Black text in input
   },
   button: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#3A5683', // Secondary color for button
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
@@ -172,7 +173,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#ccc',
   },
   buttonText: {
-    color: '#fff',
+    color: '#FFFFFF', // White text on secondary color
     fontSize: 16,
     fontWeight: '600',
   },
@@ -181,7 +182,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   switchButtonText: {
-    color: '#007AFF',
+    color: '#3A5683', // Secondary color for link text
     fontSize: 16,
     fontWeight: '500',
   },

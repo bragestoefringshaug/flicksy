@@ -15,11 +15,11 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Dimensions,
-  StyleSheet,
-  View
+    ActivityIndicator,
+    Alert,
+    Dimensions,
+    StyleSheet,
+    View
 } from 'react-native';
 import MovieCard from '../components/MovieCard';
 import { ThemedText } from '../components/ThemedText';
@@ -376,7 +376,7 @@ export default function SwipeScreen(): React.ReactElement {
     console.log('⏳ Showing loading screen...');
     return (
       <ThemedView style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
+        <ActivityIndicator size="large" color="#3A5683" />
         <ThemedText style={styles.loadingText}>Loading movies and TV shows...</ThemedText>
       </ThemedView>
     );
@@ -386,7 +386,7 @@ export default function SwipeScreen(): React.ReactElement {
     console.log('🔍 Showing "Finding great picks" screen...');
     return (
       <ThemedView style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
+        <ActivityIndicator size="large" color="#3A5683" />
         <ThemedText style={styles.loadingText}>Finding great picks for you...</ThemedText>
         <ThemedText style={styles.loadingSubtext}>Refreshing recommendations...</ThemedText>
       </ThemedView>
@@ -437,12 +437,51 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: '#666',
+    color: '#000000', // Black text on primary background
   },
   loadingSubtext: {
     marginTop: 8,
     fontSize: 14,
-    color: '#999',
+    color: '#000000', // Black text on primary background
+  },
+
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  emptyTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptySubtitle: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 60,
+    paddingBottom: 20,
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+  },
+  refreshButton: {
+    padding: 8,
+  },
+  refreshButtonText: {
+    color: '#3A5683', // Secondary color for link text
+    fontSize: 16,
+    fontWeight: '600',
   },
   cardContainer: {
     flex: 1,

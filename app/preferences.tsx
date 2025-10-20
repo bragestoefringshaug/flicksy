@@ -1,10 +1,14 @@
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
-import { useNavigation, useRouter } from 'expo-router';
-import { useEffect } from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ALL_GENRES } from '@/constants/Genres';
 import { useAuth } from '@/contexts/AuthContext';
+import { useNavigation, useRouter } from 'expo-router';
+import { useEffect, useMemo, useState } from 'react';
+import { Alert, FlatList, Pressable, StyleSheet,TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+// Use shared genre list
+
+
 
 export default function PreferencesScreen() {
   const { user } = useAuth();
@@ -80,33 +84,45 @@ const styles = StyleSheet.create({
   menuContainer: {
     gap: 12,
   },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-    backgroundColor: '#fff',
-    borderRadius: 12,
+
+  // Make genre items look/behave like StreamingServices cards
+  chip: {
+    flex: 1,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
-  },
-  menuLeft: {
-    flexDirection: 'row',
+    borderColor: '#3A5683',
+    borderRadius: 14,
     alignItems: 'center',
-    flex: 1,
+    backgroundColor: '#FFFFFF',
   },
-  menuTextContainer: {
-    marginLeft: 16,
-    flex: 1,
+  chipSelected: {
+    backgroundColor: '#3A5683',
+    borderColor: '#3A5683',
   },
-  menuTitle: {
+  chipText: {
     fontSize: 16,
+    fontWeight: '600',
+    color: '#000000',
+  },
+  chipTextSelected: {
+    color: '#FFFFFF',
     fontWeight: '600',
     marginBottom: 4,
   },
-  menuSubtitle: {
-    fontSize: 14,
+
+  saveButton: {
+    backgroundColor: '#3A5683', // Secondary color for button
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  saveButtonDisabled: {
     opacity: 0.6,
+  },
+  saveButtonText: {
+    color: 'white',
+    fontWeight: '600',
   },
 });
 

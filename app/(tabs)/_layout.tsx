@@ -11,16 +11,16 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors.dark.tint,
-        tabBarInactiveTintColor: Colors.dark.tabIconDefault,
+        tabBarActiveTintColor: Colors.light.tabIconSelected,
+        tabBarInactiveTintColor: Colors.light.tabIconDefault,
         headerShown: false,
         tabBarButton: HapticTab,
         tabBarBackground: TabBarBackground,
         tabBarStyle: Platform.select({
           ios: {
-            // Use a transparent background on iOS to show the blur effect
+            // Use secondary color background for navbar
             position: 'absolute',
-            backgroundColor: 'transparent',
+            backgroundColor: Colors.light.secondary,
             borderTopWidth: 0,
             borderTopColor: 'transparent',
             elevation: 0,
@@ -28,7 +28,7 @@ export default function TabLayout() {
             shadowOffset: { width: 0, height: 0 },
           },
           default: {
-            backgroundColor: 'transparent',
+            backgroundColor: Colors.light.secondary,
             borderTopWidth: 0,
             borderTopColor: 'transparent',
             elevation: 0,
