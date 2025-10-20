@@ -150,7 +150,7 @@ export default function WatchlistScreen() {
   }, [user]);
 
   const loadWatchlist = async () => {
-    if (!user || user.preferences.watchlist.length === 0) {
+    if (!user || !user.preferences || user.preferences.watchlist?.length === 0) {
       setWatchlistItems([]);
       setIsLoading(false);
       return;
@@ -206,7 +206,7 @@ export default function WatchlistScreen() {
           text: 'Remove',
           style: 'destructive',
           onPress: async () => {
-            const updatedWatchlist = user.preferences.watchlist.filter(id => id !== itemId);
+            const updatedWatchlist = (user.preferences?.watchlist || []).filter(id => id !== itemId);
             await updatePreferences({ watchlist: updatedWatchlist });
             setWatchlistItems(prev => prev.filter(item => item.id !== itemId));
           },
@@ -218,7 +218,7 @@ export default function WatchlistScreen() {
   const removeFromWatchlistImmediate = async (itemId: number) => {
     if (!user) return;
     try {
-      const updatedWatchlist = user.preferences.watchlist.filter(id => id !== itemId);
+      const updatedWatchlist = (user.preferences?.watchlist || []).filter(id => id !== itemId);
       await updatePreferences({ watchlist: updatedWatchlist });
       setWatchlistItems(prev => prev.filter(item => item.id !== itemId));
     } catch (e) {
@@ -229,7 +229,7 @@ export default function WatchlistScreen() {
   const markItemAsSeen = async (itemId: number) => {
     if (!user) return;
     try {
-      const seen = new Set(user.preferences.seen ?? []);
+      const seen = new Set(user.preferences?.seen ?? []);
       seen.add(itemId);
       await updatePreferences({ seen: Array.from(seen) });
       // Keep the item in the list; UI will now show Seen badge
