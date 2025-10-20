@@ -54,15 +54,15 @@ export class RecommendationService {
    */
   updatePreferences(preferences: UserPreferences) {
     // Only learn from preferences if there are valid items and learning is enabled
-    if (this.learningEnabled && preferences.likedMovies.length > 0) {
+    if (this.learningEnabled && preferences.likedMovies && preferences.likedMovies.length > 0) {
       this.learnFromLikedContent(preferences.likedMovies);
     }
-    if (this.learningEnabled && preferences.dislikedMovies.length > 0) {
+    if (this.learningEnabled && preferences.dislikedMovies && preferences.dislikedMovies.length > 0) {
       this.learnFromDislikedContent(preferences.dislikedMovies);
     }
     this.updateTypePreferences(preferences);
     // Seed genre weights from explicitly selected genres
-    this.seedExplicitGenrePreferences(preferences.genres).catch((e) => {
+    this.seedExplicitGenrePreferences(preferences.genres || []).catch((e) => {
       console.warn('Failed to seed genre preferences:', e);
     });
   }
@@ -192,12 +192,16 @@ export class RecommendationService {
 
   // Update type preferences (movies vs TV shows)
   private updateTypePreferences(preferences: UserPreferences) {
-    const totalLiked = preferences.likedMovies.length + preferences.watchlist.length;
-    const totalDisliked = preferences.dislikedMovies.length;
+    const likedMovies = preferences.likedMovies || [];
+    const dislikedMovies = preferences.dislikedMovies || [];
+    const watchlist = preferences.watchlist || [];
+    
+    const totalLiked = likedMovies.length + watchlist.length;
+    const totalDisliked = dislikedMovies.length;
     
     if (totalLiked > 0) {
-      this.typePreference.movies = preferences.likedMovies.length / totalLiked;
-      this.typePreference.tvShows = preferences.watchlist.length / totalLiked;
+      this.typePreference.movies = likedMovies.length / totalLiked;
+      this.typePreference.tvShows = watchlist.length / totalLiked;
     }
   }
 

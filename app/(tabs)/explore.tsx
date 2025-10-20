@@ -3,11 +3,11 @@ import { ThemedView } from '@/components/ThemedView';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, type Href } from 'expo-router';
 import {
-  Alert,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  View
+    Alert,
+    ScrollView,
+    StyleSheet,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -51,15 +51,15 @@ export default function ProfileScreen() {
 
         <View style={styles.statsContainer}>
           <View style={styles.statItem}>
-            <ThemedText style={styles.statNumber}>{user?.preferences.likedMovies.length || 0}</ThemedText>
+            <ThemedText style={styles.statNumber}>{user?.preferences?.likedMovies?.length || 0}</ThemedText>
             <ThemedText style={styles.statLabel}>Liked</ThemedText>
           </View>
           <View style={styles.statItem}>
-            <ThemedText style={styles.statNumber}>{user?.preferences.watchlist.length || 0}</ThemedText>
+            <ThemedText style={styles.statNumber}>{user?.preferences?.watchlist?.length || 0}</ThemedText>
             <ThemedText style={styles.statLabel}>Watchlist</ThemedText>
           </View>
           <View style={styles.statItem}>
-            <ThemedText style={styles.statNumber}>{user?.preferences.dislikedMovies.length || 0}</ThemedText>
+            <ThemedText style={styles.statNumber}>{user?.preferences?.dislikedMovies?.length || 0}</ThemedText>
             <ThemedText style={styles.statLabel}>Disliked</ThemedText>
           </View>
         </View>
