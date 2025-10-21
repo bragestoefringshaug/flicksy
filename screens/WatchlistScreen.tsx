@@ -1,25 +1,25 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Animated,
-  FlatList,
-  Image,
-  Modal,
-  PanResponder,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    Animated,
+    FlatList,
+    Image,
+    Modal,
+    PanResponder,
+    RefreshControl,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { ThemedText } from '../components/ThemedText';
 import { ThemedView } from '../components/ThemedView';
 import { ALL_GENRES } from '../constants/Genres';
 import { useAuth } from '../contexts/AuthContext';
 import { MovieMetadata } from '../services/firebaseDb';
-import { Movie, movieApi } from '../services/movieApi';
+import { movieApi } from '../services/movieApi';
 
 interface WatchlistItem {
   id: number;
@@ -52,7 +52,6 @@ const WatchlistRow: React.FC<WatchlistRowProps> = ({ item, onMarkSeen, onDelete 
   // Static reveal text; swipe action handles marking as seen
 
   const translateX = React.useRef(new Animated.Value(0)).current;
-  const [eyeFilled, setEyeFilled] = React.useState(false);
   const [revealLabel, setRevealLabel] = React.useState<'Not Seen' | 'Seen'>('Not Seen');
   const seenTextOpacity = translateX.interpolate({
     inputRange: [-160, -80, 0],
@@ -80,12 +79,6 @@ const WatchlistRow: React.FC<WatchlistRowProps> = ({ item, onMarkSeen, onDelete 
     })
   ).current;
 
-  const handleNudgeSeen = () => {
-    Animated.spring(translateX, { toValue: -120, useNativeDriver: false }).start(() => {
-      Animated.spring(translateX, { toValue: 0, useNativeDriver: false }).start();
-    });
-  };
-
   return (
     <View style={styles.swipeContainer}>
       <View style={styles.revealRight}>
@@ -110,14 +103,10 @@ const WatchlistRow: React.FC<WatchlistRowProps> = ({ item, onMarkSeen, onDelete 
             <TouchableOpacity
               style={styles.removeButton}
               onPress={() => {
-                // Keep original functionality (nudge only)
-                handleNudgeSeen();
-                // Toggle icon fill and label
-                setEyeFilled(prev => !prev);
-                setRevealLabel(prev => (prev === 'Seen' ? 'Not Seen' : 'Seen'));
+                onMarkSeen(item.id);
               }}
             >
-              <Ionicons name={eyeFilled ? 'eye' : 'eye-outline'} size={24} color="#3A5683" />
+              <Ionicons name="eye-outline" size={24} color="#3A5683" />
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.removeButton}
@@ -161,9 +150,10 @@ export default function WatchlistScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
-  const [seenFilter, setSeenFilter] = useState<'all' | 'seen' | 'unseen'>('all');
+  const [mediaFilter, setMediaFilter] = useState<'all' | 'movie' | 'tv'>('all');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const [activeFilterTab, setActiveFilterTab] = useState<'Genres' | 'Seen'>('Genres');
+  const [activeFilterTab, setActiveFilterTab] = useState<'Genres' | 'Media'>('Genres');
+  const [activeMainTab, setActiveMainTab] = useState<'watchlist' | 'seen'>('watchlist');
 
   /**
    * Extract movie metadata for ML purposes
@@ -280,8 +270,7 @@ export default function WatchlistScreen() {
         }
       }
       
-      // Keep the item in the list; UI will now show Seen badge
-      setWatchlistItems(prev => prev);
+      // Item will automatically move to Seen tab due to filtering
     } catch (e) {
       console.error('Failed to mark item as seen', e);
     }
@@ -310,27 +299,47 @@ export default function WatchlistScreen() {
 
   const displayedItems = useMemo(() => {
     let items = watchlistItems;
-    // Seen filter first
-    if (seenFilter !== 'all') {
-      const mustBeSeen = seenFilter === 'seen';
-      items = items.filter(i => mustBeSeen ? userSeenIds.has(i.id) : !userSeenIds.has(i.id));
+    
+    // First filter by main tab (watchlist vs seen)
+    if (activeMainTab === 'watchlist') {
+      items = items.filter(i => !userSeenIds.has(i.id));
+    } else {
+      items = items.filter(i => userSeenIds.has(i.id));
+    }
+    
+    // Media filter
+    if (mediaFilter !== 'all') {
+      const mustBeMovie = mediaFilter === 'movie';
+      items = items.filter(i => i.isMovie === mustBeMovie);
     }
     // Genre filter
     if (selectedGenre) {
       items = items.filter(i => i.genreNames.includes(selectedGenre));
     }
     return items;
-  }, [watchlistItems, selectedGenre, seenFilter, userSeenIds]);
+  }, [watchlistItems, selectedGenre, mediaFilter, activeMainTab, userSeenIds]);
 
-  const renderEmptyState = () => (
-    <View style={styles.emptyContainer}>
-      <Ionicons name="bookmark-outline" size={64} color="#999" />
-      <ThemedText style={styles.emptyTitle}>Your watchlist is empty</ThemedText>
-      <ThemedText style={styles.emptySubtitle}>
-        Start swiping to add movies and TV shows you want to watch!
-      </ThemedText>
-    </View>
-  );
+  const renderEmptyState = () => {
+    const message = activeMainTab === 'watchlist' 
+      ? {
+          title: 'Your watchlist is empty',
+          subtitle: 'Start swiping to add movies and TV shows you want to watch!'
+        }
+      : {
+          title: 'No seen items yet',
+          subtitle: 'Mark items as seen by clicking the eye icon to see them here!'
+        };
+    
+    return (
+      <View style={styles.emptyContainer}>
+        <Ionicons name="bookmark-outline" size={64} color="#999" />
+        <ThemedText style={styles.emptyTitle}>{message.title}</ThemedText>
+        <ThemedText style={styles.emptySubtitle}>
+          {message.subtitle}
+        </ThemedText>
+      </View>
+    );
+  };
 
   if (isLoading) {
     return (
@@ -344,7 +353,27 @@ export default function WatchlistScreen() {
   return (
     <ThemedView style={styles.container}>
       <View style={styles.header}>
-        <ThemedText style={styles.headerTitle}>My Watchlist</ThemedText>
+        {/* Main tabs: Watchlist / Seen */}
+        <View style={styles.mainTabsRow}>
+          <TouchableOpacity
+            style={[styles.mainTabButton, activeMainTab === 'watchlist' && styles.mainTabButtonActive]}
+            onPress={() => setActiveMainTab('watchlist')}
+          >
+            <Text style={[styles.mainTabButtonText, activeMainTab === 'watchlist' && styles.mainTabButtonTextActive]}>
+              Watchlist
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.mainTabButton, activeMainTab === 'seen' && styles.mainTabButtonActive]}
+            onPress={() => setActiveMainTab('seen')}
+          >
+            <Text style={[styles.mainTabButtonText, activeMainTab === 'seen' && styles.mainTabButtonTextActive]}>
+              Seen
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Filter button below tabs */}
         <View style={styles.headerRight}>
           <TouchableOpacity style={styles.filterButton} onPress={() => setIsFilterOpen(true)}>
             <Ionicons name="filter" size={18} color="#FFFFFF" />
@@ -380,10 +409,10 @@ export default function WatchlistScreen() {
                 <Text style={[styles.tabButtonText, activeFilterTab === 'Genres' && styles.tabButtonTextActive]}>Genres</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.tabButton, activeFilterTab === 'Seen' && styles.tabButtonActive]}
-                onPress={() => setActiveFilterTab('Seen')}
+                style={[styles.tabButton, activeFilterTab === 'Media' && styles.tabButtonActive]}
+                onPress={() => setActiveFilterTab('Media')}
               >
-                <Text style={[styles.tabButtonText, activeFilterTab === 'Seen' && styles.tabButtonTextActive]}>Seen</Text>
+                <Text style={[styles.tabButtonText, activeFilterTab === 'Media' && styles.tabButtonTextActive]}>Media</Text>
               </TouchableOpacity>
             </View>
 
@@ -408,22 +437,22 @@ export default function WatchlistScreen() {
             ) : (
               <View style={styles.genreChipsContainer}>
                 <TouchableOpacity
-                  style={[styles.chip, seenFilter === 'all' && styles.chipSelected]}
-                  onPress={() => setSeenFilter('all')}
+                  style={[styles.chip, mediaFilter === 'all' && styles.chipSelected]}
+                  onPress={() => setMediaFilter('all')}
                 >
-                  <Text style={[styles.chipText, seenFilter === 'all' && styles.chipTextSelected]}>All</Text>
+                  <Text style={[styles.chipText, mediaFilter === 'all' && styles.chipTextSelected]}>All</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.chip, seenFilter === 'seen' && styles.chipSelected]}
-                  onPress={() => setSeenFilter('seen')}
+                  style={[styles.chip, mediaFilter === 'movie' && styles.chipSelected]}
+                  onPress={() => setMediaFilter('movie')}
                 >
-                  <Text style={[styles.chipText, seenFilter === 'seen' && styles.chipTextSelected]}>Seen</Text>
+                  <Text style={[styles.chipText, mediaFilter === 'movie' && styles.chipTextSelected]}>Film</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.chip, seenFilter === 'unseen' && styles.chipSelected]}
-                  onPress={() => setSeenFilter('unseen')}
+                  style={[styles.chip, mediaFilter === 'tv' && styles.chipSelected]}
+                  onPress={() => setMediaFilter('tv')}
                 >
-                  <Text style={[styles.chipText, seenFilter === 'unseen' && styles.chipTextSelected]}>Unseen</Text>
+                  <Text style={[styles.chipText, mediaFilter === 'tv' && styles.chipTextSelected]}>TV Show</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -459,20 +488,40 @@ const styles = StyleSheet.create({
     paddingTop: 60,
     paddingBottom: 20,
   },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
   headerSubtitle: {
     fontSize: 16,
     color: '#666',
+  },
+  mainTabsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  mainTabButton: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 999,
+    backgroundColor: '#f7f7f7',
+  },
+  mainTabButtonActive: {
+    backgroundColor: '#3A5683',
+    borderColor: '#3A5683',
+  },
+  mainTabButtonText: {
+    color: '#000000',
+    fontWeight: '600',
+    fontSize: 16,
+  },
+  mainTabButtonTextActive: {
+    color: '#FFFFFF',
   },
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    marginTop: 8, // Added margin to create space between title and filter button
   },
   tabsRow: {
     flexDirection: 'row',
